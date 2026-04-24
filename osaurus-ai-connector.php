@@ -5,7 +5,7 @@
  * Description:       Registers Osaurus (local Apple Silicon LLM runtime) as a provider for the WordPress AI Client.
  * Requires at least: 7.0
  * Requires PHP:      7.4
- * Version:           0.1.0
+ * Version:           0.3.0
  * Author:            Andrei Lupu
  * License:           GPL-2.0-or-later
  * License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
@@ -45,7 +45,7 @@ const PLUGIN_FILE = __FILE__;
  * @since 0.1.0
  * @var string
  */
-const PLUGIN_VERSION = '0.1.0';
+const PLUGIN_VERSION = '0.3.0';
 
 /**
  * Default Osaurus base URL, used when no constant or option is provided.
@@ -224,3 +224,94 @@ function allow_osaurus_port( array $ports ): array {
 	return array_values( array_unique( $ports ) );
 }
 add_filter( 'http_allowed_safe_ports', __NAMESPACE__ . '\\allow_osaurus_port' );
+
+/**
+ * Registers the Osaurus base-URL option so it can be read and written via
+ * the WordPress Settings REST API (`/wp/v2/settings`).
+ *
+ * Our custom admin React component (see `assets/js/connector-settings.js`)
+ * uses `useEntityRecord( 'root', 'site' )` from `@wordpress/core-data` to
+ * read and persist this option. That flow only works when the option is
+ * registered against the `connectors` settings group with `show_in_rest`
+ * enabled and a sensible sanitize callback.
+ *
+ * @since 0.3.0
+ *
+ * @return void
+ */
+function register_base_url_setting(): void {
+	register_setting(
+		'connectors',
+		BASE_URL_OPTION,
+		array(
+			'type'              => 'string',
+			'label'             => __( 'Osaurus Server URL', 'osaurus-ai-connector' ),
+			'description'       => __( 'Base URL of your local Osaurus server, including the /v1 path.', 'osaurus-ai-connector' ),
+			'default'           => DEFAULT_BASE_URL,
+			'show_in_rest'      => true,
+			'sanitize_callback' => 'esc_url_raw',
+		)
+	);
+}
+add_action( 'init', __NAMESPACE__ . '\\register_base_url_setting' );
+
+/**
+ * Enqueues the plugin's JavaScript module on the Connectors admin screen.
+ *
+ * The module registers a custom render for the Osaurus connector via
+ * `__experimentalRegisterConnector`, replacing the legacy API-key input
+ * with a URL input. All reads and writes go through the Settings REST API
+ * using `@wordpress/core-data`.
+ *
+ * Enqueue triggers on both the wp-admin integrated screen
+ * (`settings_page_options-connectors-wp-admin`) and the full-page variant
+ * (`options-connectors`).
+ *
+ * @since 0.3.0
+ *
+ * @param string $hook_suffix Current admin screen hook suffix.
+ * @return void
+ */
+function enqueue_connector_settings_module( string $hook_suffix ): void {
+	$screen    = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+	$screen_id = $screen ? $screen->id : '';
+
+	$is_connectors_screen = (
+		in_array( $hook_suffix, array( 'settings_page_options-connectors-wp-admin', 'settings_page_options-connectors' ), true ) ||
+		in_array( $screen_id, array( 'options-connectors', 'settings_page_options-connectors-wp-admin' ), true )
+	);
+
+	if ( ! $is_connectors_screen ) {
+		return;
+	}
+
+	$handle = 'osaurus-ai-connector-settings';
+
+	wp_register_script_module(
+		$handle,
+		plugins_url( 'assets/js/connector-settings.js', PLUGIN_FILE ),
+		array(
+			// `@wordpress/connectors` is the only WP package exposed as a script
+			// module in WP 7.0 and is the sole ES import used by this file.
+			// All other `@wordpress/*` packages are consumed via the classic
+			// `window.wp.*` globals that the Connectors page already enqueues.
+			array(
+				'import' => 'static',
+				'id'     => '@wordpress/connectors',
+			),
+		),
+		PLUGIN_VERSION
+	);
+
+	// Ensure the classic `window.wp.*` globals our module reads are printed
+	// for this request. The Connectors page boot already enqueues them, but
+	// declaring a classic-script dependency chain guarantees availability
+	// even if the page layout changes in the future.
+	wp_enqueue_script( 'wp-core-data' );
+	wp_enqueue_script( 'wp-components' );
+	wp_enqueue_script( 'wp-element' );
+	wp_enqueue_script( 'wp-i18n' );
+
+	wp_enqueue_script_module( $handle );
+}
+add_action( 'admin_enqueue_scripts', __NAMESPACE__ . '\\enqueue_connector_settings_module' );
