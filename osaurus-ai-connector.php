@@ -5,7 +5,7 @@
  * Description:       Registers Osaurus (local Apple Silicon LLM runtime) as a provider for the WordPress AI Client.
  * Requires at least: 7.0
  * Requires PHP:      7.4
- * Version:           0.1.0
+ * Version:           0.2.0
  * Author:            Andrei Lupu
  * License:           GPL-2.0-or-later
  * License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
@@ -45,7 +45,7 @@ const PLUGIN_FILE = __FILE__;
  * @since 0.1.0
  * @var string
  */
-const PLUGIN_VERSION = '0.1.0';
+const PLUGIN_VERSION = '0.2.0';
 
 /**
  * Default Osaurus base URL, used when no constant or option is provided.
@@ -129,6 +129,49 @@ function register_provider(): void {
 	$registry->registerProvider( OsaurusProvider::class );
 }
 add_action( 'init', __NAMESPACE__ . '\\register_provider', 5 );
+
+/**
+ * Registers the Osaurus configuration fields on the Connectors admin screen.
+ *
+ * Requires the WordPress 7.1+ Connector Fields API (or the same API exposed
+ * through the Gutenberg plugin's `lib/compat/wordpress-7.1/connectors.php`
+ * back-port). Older cores without the API silently skip field registration
+ * and fall back to a key-only UI via the legacy `authentication` block.
+ *
+ * Uses the existing {@see BASE_URL_OPTION} so values saved via the new field
+ * renderer land in the same option as {@see get_base_url()} already reads,
+ * avoiding a migration step when users upgrade.
+ *
+ * @since 0.2.0
+ *
+ * @param \WP_Connector_Registry $registry Connector registry instance.
+ * @return void
+ */
+function register_fields( \WP_Connector_Registry $registry ): void {
+	if ( ! function_exists( 'register_connector_field' ) ) {
+		return;
+	}
+	if ( ! $registry->is_registered( 'osaurus' ) ) {
+		return;
+	}
+
+	\register_connector_field(
+		'osaurus',
+		'base_url',
+		array(
+			'type'              => 'url',
+			'label'             => __( 'Server URL', 'osaurus-ai-connector' ),
+			'description'       => __( 'Base URL of your local Osaurus server, including the /v1 path.', 'osaurus-ai-connector' ),
+			'placeholder'       => DEFAULT_BASE_URL,
+			'default'           => DEFAULT_BASE_URL,
+			'sanitize_callback' => 'esc_url_raw',
+			'setting_name'      => BASE_URL_OPTION,
+			'env_var_name'      => 'OSAURUS_BASE_URL',
+			'constant_name'     => 'OSAURUS_BASE_URL',
+		)
+	);
+}
+add_action( 'wp_connectors_init', __NAMESPACE__ . '\\register_fields' );
 
 /**
  * Registers a placeholder API-key authentication for Osaurus.
