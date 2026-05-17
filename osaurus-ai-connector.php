@@ -4,9 +4,11 @@
  * Plugin URI:        https://github.com/andreilupu/osaurus-ai-connector
  * Description:       Registers Osaurus (local Apple Silicon LLM runtime) as a provider for the WordPress AI Client.
  * Requires at least: 7.0
+ * Tested up to:      7.0
  * Requires PHP:      7.4
  * Version:           0.3.0
  * Author:            Andrei Lupu
+ * Author URI:        https://github.com/andreilupu
  * License:           GPL-2.0-or-later
  * License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
  * Text Domain:       osaurus-ai-connector
