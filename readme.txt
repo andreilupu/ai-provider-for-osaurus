@@ -4,7 +4,7 @@ Tags: ai, llm, osaurus, ai-client, local-ai
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPL-2.0-or-later
 License URI: https://spdx.org/licenses/GPL-2.0-or-later.html
 
@@ -45,7 +45,20 @@ The plugin resolves the Osaurus base URL in this order (first match wins):
 2. `osaurus_ai_connector_base_url` option, settable from **Settings &rarr; Connectors** in wp-admin.
 3. Default: `http://host.docker.internal:1337/v1` (works for `@wordpress/env` Docker setups).
 
-For a bare-metal install, set the constant or option to `http://127.0.0.1:1337/v1`.
+= Pick the right URL for your setup =
+
+WordPress can run in many places &mdash; the right base URL depends on how it reaches your Mac, where Osaurus is listening.
+
+* **Bare-metal WordPress on the same Mac** (MAMP, Laravel Valet, Local, WordPress Studio, native PHP):
+  `http://127.0.0.1:1337/v1`
+* **Docker-based WordPress on the same Mac** (`@wordpress/env`, DDEV, Lando, Docker Desktop):
+  `http://host.docker.internal:1337/v1` *(this is the default &mdash; no configuration needed)*
+* **WordPress on a different machine on your LAN, Osaurus on your Mac:**
+  `http://<your-mac-LAN-IP>:1337/v1` &mdash; make sure Osaurus is bound to a non-loopback interface and your firewall allows port 1337.
+* **Remote Osaurus you operate** (e.g. a Mac mini on Tailscale, a colocated server):
+  `http://<remote-host>:1337/v1` or `https://...` if you front it with TLS.
+
+The fastest way to confirm a URL works from the WordPress host: run `curl <base-url>/models` from the same shell environment WordPress runs in. A JSON list back means the connector will work.
 
 = External services =
 
@@ -107,6 +120,13 @@ Confirm Osaurus is running and reachable from the host running WordPress. If you
 
 == Changelog ==
 
+= 0.4.0 =
+* New: live "Reachable" status indicator under the URL field, with round-trip latency.
+* New: quick-pick preset buttons for bare-metal (`127.0.0.1`) and Docker (`host.docker.internal`) setups.
+* New: default-model dropdown populated from the configured Osaurus server.
+* New: `GET /osaurus-ai-connector/v1/models` REST route (admin-only) that proxies the Osaurus models list and accepts a `base_url` override for pre-save probing.
+* New: `osaurus_ai_connector_default_model` option, readable by consumer plugins as a fallback model.
+
 = 0.3.0 =
 * Custom Connectors UI: replaces the API-key field with a URL input backed by the Settings REST API.
 * Registers `osaurus_ai_connector_base_url` as a typed REST setting with `esc_url_raw` sanitization.
@@ -119,6 +139,9 @@ Confirm Osaurus is running and reachable from the host running WordPress. If you
 * Initial release: registers Osaurus as a WordPress AI Client provider with text generation, chat history, tool calls, structured JSON output, and streaming.
 
 == Upgrade Notice ==
+
+= 0.4.0 =
+Adds a connection status indicator, preset buttons, and a default-model picker. No data migration required.
 
 = 0.3.0 =
 Adds an in-admin URL field; no data migration required.

@@ -6,7 +6,7 @@
  * Requires at least: 7.0
  * Tested up to:      7.0
  * Requires PHP:      7.4
- * Version:           0.3.0
+ * Version:           0.4.0
  * Author:            Andrei Lupu
  * Author URI:        https://github.com/andreilupu
  * License:           GPL-2.0-or-later
@@ -47,7 +47,7 @@ const PLUGIN_FILE = __FILE__;
  * @since 0.1.0
  * @var string
  */
-const PLUGIN_VERSION = '0.3.0';
+const PLUGIN_VERSION = '0.4.0';
 
 /**
  * Default Osaurus base URL, used when no constant or option is provided.
@@ -69,6 +69,17 @@ const DEFAULT_BASE_URL = 'http://host.docker.internal:1337/v1';
  * @var string
  */
 const BASE_URL_OPTION = 'osaurus_ai_connector_base_url';
+
+/**
+ * Option name used to persist a user-selected default model.
+ *
+ * Consumer plugins may read this option to fall back to the user's preferred
+ * Osaurus model when the caller has not specified one explicitly.
+ *
+ * @since 0.4.0
+ * @var string
+ */
+const DEFAULT_MODEL_OPTION = 'osaurus_ai_connector_default_model';
 
 require_once __DIR__ . '/src/autoload.php';
 
@@ -254,8 +265,158 @@ function register_base_url_setting(): void {
 			'sanitize_callback' => 'esc_url_raw',
 		)
 	);
+
+	register_setting(
+		'connectors',
+		DEFAULT_MODEL_OPTION,
+		array(
+			'type'              => 'string',
+			'label'             => __( 'Osaurus default model', 'osaurus-ai-connector' ),
+			'description'       => __( 'Model ID to use when callers do not specify one explicitly.', 'osaurus-ai-connector' ),
+			'default'           => '',
+			'show_in_rest'      => true,
+			'sanitize_callback' => 'sanitize_text_field',
+		)
+	);
 }
 add_action( 'init', __NAMESPACE__ . '\\register_base_url_setting' );
+
+/**
+ * Registers a REST route that proxies `GET /v1/models` from the configured
+ * Osaurus server.
+ *
+ * The Connectors admin screen runs in the browser and cannot fetch the
+ * Osaurus models endpoint directly: Osaurus is typically bound to
+ * `127.0.0.1` (cross-origin to the WordPress origin) and the local server
+ * does not emit CORS headers. Routing the request through WordPress side-
+ * steps both problems and lets us reuse the plugin's `http_*` filters that
+ * already whitelist the host / port for `wp_safe_remote_get()`.
+ *
+ * Capability: requires `manage_options` so only admins can probe the
+ * configured URL — the response leaks the list of locally installed models.
+ *
+ * @since 0.4.0
+ *
+ * @return void
+ */
+function register_models_route(): void {
+	register_rest_route(
+		'osaurus-ai-connector/v1',
+		'/models',
+		array(
+			'methods'             => 'GET',
+			'permission_callback' => static function (): bool {
+				return current_user_can( 'manage_options' );
+			},
+			'args'                => array(
+				'base_url' => array(
+					'type'              => 'string',
+					'required'          => false,
+					'sanitize_callback' => 'esc_url_raw',
+					'validate_callback' => static function ( $value ): bool {
+						if ( ! is_string( $value ) || '' === $value ) {
+							return false;
+						}
+						$scheme = wp_parse_url( $value, PHP_URL_SCHEME );
+						return in_array( $scheme, array( 'http', 'https' ), true );
+					},
+				),
+			),
+			'callback'            => __NAMESPACE__ . '\\rest_get_models',
+		)
+	);
+}
+add_action( 'rest_api_init', __NAMESPACE__ . '\\register_models_route' );
+
+/**
+ * REST callback: returns the model IDs advertised by the configured Osaurus
+ * server, or a WP_Error on failure.
+ *
+ * Uses `wp_safe_remote_get()` (not `wp_remote_get()`) so the host / port
+ * whitelisting done by `allow_localhost_requests()` and `allow_osaurus_port()`
+ * applies. A short timeout keeps the admin screen responsive when Osaurus
+ * is offline.
+ *
+ * @since 0.4.0
+ *
+ * @param \WP_REST_Request $request Incoming REST request; may carry a `base_url`
+ *                                  query arg so the admin UI can probe an
+ *                                  unsaved URL before persisting it.
+ * @return \WP_REST_Response|\WP_Error
+ */
+function rest_get_models( \WP_REST_Request $request ) {
+	$override = $request->get_param( 'base_url' );
+	$base     = is_string( $override ) && '' !== $override ? rtrim( $override, '/' ) : get_base_url();
+
+	// Whitelist the override host / port for this single request so
+	// `wp_safe_remote_get()` does not reject it before our regular filters
+	// see it (those filters read from the saved option, which has not been
+	// updated yet when the admin is still editing).
+	$probe_host = wp_parse_url( $base, PHP_URL_HOST );
+	$probe_port = wp_parse_url( $base, PHP_URL_PORT );
+
+	$allow_host = static function ( bool $external, string $host ) use ( $probe_host ): bool {
+		return ( $probe_host && $host === $probe_host ) ? true : $external;
+	};
+	$allow_port = static function ( array $ports ) use ( $probe_port ): array {
+		if ( $probe_port ) {
+			$ports[] = (int) $probe_port;
+		}
+		return array_values( array_unique( $ports ) );
+	};
+	add_filter( 'http_request_host_is_external', $allow_host, 10, 2 );
+	add_filter( 'http_allowed_safe_ports', $allow_port );
+
+	$url      = trailingslashit( $base ) . 'models';
+	$response = wp_safe_remote_get(
+		$url,
+		array(
+			'timeout' => 5,
+			'headers' => array( 'Accept' => 'application/json' ),
+		)
+	);
+
+	remove_filter( 'http_request_host_is_external', $allow_host, 10 );
+	remove_filter( 'http_allowed_safe_ports', $allow_port );
+
+	if ( is_wp_error( $response ) ) {
+		return new \WP_Error(
+			'osaurus_unreachable',
+			$response->get_error_message(),
+			array( 'status' => 502 )
+		);
+	}
+
+	$code = (int) wp_remote_retrieve_response_code( $response );
+	if ( $code < 200 || $code >= 300 ) {
+		return new \WP_Error(
+			'osaurus_bad_response',
+			/* translators: %d: HTTP status code returned by Osaurus. */
+			sprintf( __( 'Osaurus responded with HTTP %d.', 'osaurus-ai-connector' ), $code ),
+			array( 'status' => 502 )
+		);
+	}
+
+	$body    = wp_remote_retrieve_body( $response );
+	$decoded = json_decode( $body, true );
+	if ( ! is_array( $decoded ) || ! isset( $decoded['data'] ) || ! is_array( $decoded['data'] ) ) {
+		return new \WP_Error(
+			'osaurus_malformed_response',
+			__( 'Osaurus returned a response without the expected `data` array.', 'osaurus-ai-connector' ),
+			array( 'status' => 502 )
+		);
+	}
+
+	$ids = array();
+	foreach ( $decoded['data'] as $model ) {
+		if ( isset( $model['id'] ) && is_string( $model['id'] ) && '' !== $model['id'] ) {
+			$ids[] = $model['id'];
+		}
+	}
+	sort( $ids );
+
+	return rest_ensure_response( array( 'models' => $ids ) );
+}
 
 /**
  * Enqueues the plugin's JavaScript module on the Connectors admin screen.
@@ -313,6 +474,8 @@ function enqueue_connector_settings_module( string $hook_suffix ): void {
 	wp_enqueue_script( 'wp-components' );
 	wp_enqueue_script( 'wp-element' );
 	wp_enqueue_script( 'wp-i18n' );
+	wp_enqueue_script( 'wp-api-fetch' );
+	wp_enqueue_script( 'wp-url' );
 
 	wp_enqueue_script_module( $handle );
 }
