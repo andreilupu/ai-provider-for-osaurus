@@ -86,9 +86,10 @@ class OsaurusProvider extends AbstractApiProvider {
 			}
 		}
 
-		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message is not rendered to users.
 		throw new RuntimeException(
-			'Unsupported Osaurus model capabilities: ' . implode( ', ', $modelMetadata->getSupportedCapabilities() )
+			esc_html(
+				'Unsupported Osaurus model capabilities: ' . implode( ', ', $modelMetadata->getSupportedCapabilities() )
+			)
 		);
 	}
 
