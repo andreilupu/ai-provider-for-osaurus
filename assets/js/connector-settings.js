@@ -75,17 +75,76 @@ function OsaurusSettings() {
 	const currentModel = editedRecord?.[ DEFAULT_MODEL_OPTION ] ?? '';
 	const isConnected = Boolean( currentValue );
 
-	// Models fetched from the server-side REST proxy. Kept as local state
-	// because the result depends on what Osaurus advertises right now, not
-	// on any persisted WordPress data.
+	// Now reading the current time for latency measurement.
+	const now = () =>
+		typeof performance !== 'undefined' && performance.now
+			? performance.now()
+			: Date.now();
+
+	// Health state — drives the status row directly under the URL field.
+	// We probe `/health` (server root) instead of `/v1/models` because it is
+	// the lighter authoritative reachability check and exposes the currently
+	// loaded model so the row can describe what Osaurus is actually serving.
+	const [ health, setHealth ] = useState( null );
+	const [ healthError, setHealthError ] = useState( '' );
+	const [ isProbingHealth, setIsProbingHealth ] = useState( false );
+	const [ latencyMs, setLatencyMs ] = useState( null );
+
+	// Models fetched from the server-side REST proxy for the default-model
+	// dropdown. Kept as local state because the result depends on what
+	// Osaurus advertises right now, not on any persisted WordPress data.
 	const [ models, setModels ] = useState( [] );
 	const [ modelsError, setModelsError ] = useState( '' );
 	const [ isLoadingModels, setIsLoadingModels ] = useState( false );
-	const [ latencyMs, setLatencyMs ] = useState( null );
 
-	// Refetch the model list whenever the panel opens or the URL changes.
-	// Debounced so we do not hammer the REST proxy on every keystroke while
-	// the user is still typing.
+	// Two effects, two probes, run in parallel: `/health` answers "is the
+	// server up?" fast, `/v1/models` populates the dropdown. Both debounce
+	// on URL change so a keystroke storm does not flood the REST proxy.
+
+	useEffect( () => {
+		if ( ! isExpanded || ! currentValue ) {
+			return;
+		}
+
+		let cancelled = false;
+		const handle = setTimeout( () => {
+			setIsProbingHealth( true );
+			setHealthError( '' );
+			const startedAt = now();
+
+			apiFetch( {
+				path: addQueryArgs( '/osaurus-ai-connector/v1/health', {
+					base_url: currentValue,
+				} ),
+			} )
+				.then( ( payload ) => {
+					if ( cancelled ) {
+						return;
+					}
+					setHealth( payload || null );
+					setLatencyMs( Math.round( now() - startedAt ) );
+					setIsProbingHealth( false );
+				} )
+				.catch( ( err ) => {
+					if ( cancelled ) {
+						return;
+					}
+					setHealth( null );
+					setLatencyMs( null );
+					setHealthError(
+						err?.message ||
+							__( 'Could not reach Osaurus.', 'osaurus-ai-connector' )
+					);
+					setIsProbingHealth( false );
+				} );
+		}, 350 );
+
+		return () => {
+			cancelled = true;
+			clearTimeout( handle );
+		};
+	}, [ isExpanded, currentValue ] );
+
 	useEffect( () => {
 		if ( ! isExpanded || ! currentValue ) {
 			return;
@@ -95,24 +154,20 @@ function OsaurusSettings() {
 		const handle = setTimeout( () => {
 			setIsLoadingModels( true );
 			setModelsError( '' );
-			const startedAt =
-				typeof performance !== 'undefined' && performance.now
-					? performance.now()
-					: Date.now();
 
 			apiFetch( {
-				path: addQueryArgs(
-					'/osaurus-ai-connector/v1/models',
-					{ base_url: currentValue }
-				),
+				path: addQueryArgs( '/osaurus-ai-connector/v1/models', {
+					base_url: currentValue,
+				} ),
 			} )
 				.then( ( payload ) => {
 					if ( cancelled ) {
 						return;
 					}
-					const list = Array.isArray( payload?.models ) ? payload.models : [];
+					const list = Array.isArray( payload?.models )
+						? payload.models
+						: [];
 					setModels( list );
-					setLatencyMs( Math.round( ( typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now() ) - startedAt ) );
 					setIsLoadingModels( false );
 				} )
 				.catch( ( err ) => {
@@ -120,7 +175,6 @@ function OsaurusSettings() {
 						return;
 					}
 					setModels( [] );
-					setLatencyMs( null );
 					setModelsError(
 						err?.message ||
 							__( 'Could not reach Osaurus.', 'osaurus-ai-connector' )
@@ -191,26 +245,57 @@ function OsaurusSettings() {
 
 	let statusRow = null;
 	if ( currentValue ) {
+		const status = health?.status || '';
+		const loaded = Array.isArray( health?.loaded ) ? health.loaded : [];
+		const currentlyLoadedModel =
+			( typeof health?.current_model === 'string' && health.current_model ) ||
+			( loaded.length > 0 ? loaded[ 0 ] : '' );
+
 		let dotEl;
 		let label;
-		if ( isLoadingModels ) {
+		if ( isProbingHealth ) {
 			dotEl = h( Spinner, null );
 			label = __( 'Testing connection…', 'osaurus-ai-connector' );
-		} else if ( modelsError ) {
+		} else if ( healthError ) {
 			dotEl = dot( '#D63638' );
-			label = sprintf(
-				/* translators: %s: error message returned by the server. */
-				__( 'Unreachable — %s', 'osaurus-ai-connector' ),
-				modelsError
+			// Two-line label: the raw server-side error stays on top so power
+			// users see exactly what failed (cURL message, HTTP code, etc.),
+			// and a friendlier hint follows underneath linking to the Osaurus
+			// download page. Most "unreachable" reports we will get are not
+			// network bugs — they are "the app isn't running yet" — so the
+			// onboarding nudge does more work than a longer error.
+			label = h(
+				VStack,
+				{ spacing: 0 },
+				h(
+					'span',
+					null,
+					sprintf(
+						/* translators: %s: error message returned by the server. */
+						__( 'Unreachable — %s', 'osaurus-ai-connector' ),
+						healthError
+					)
+				),
+				h(
+					'span',
+					{ style: { color: '#646970' } },
+					__(
+						'Have you installed Osaurus and started the app? Download it at ',
+						'osaurus-ai-connector'
+					),
+					h(
+						'a',
+						{
+							href: 'https://osaurus.ai',
+							target: '_blank',
+							rel: 'noreferrer noopener',
+						},
+						'osaurus.ai'
+					),
+					'.'
+				)
 			);
-		} else if ( models.length === 0 ) {
-			dotEl = dot( '#DBA617' );
-			label = __(
-				'Reachable, but no models advertised.',
-				'osaurus-ai-connector'
-			);
-		} else {
-			dotEl = dot( '#00A32A' );
+		} else if ( health ) {
 			const latencyPart =
 				latencyMs !== null
 					? sprintf(
@@ -219,29 +304,55 @@ function OsaurusSettings() {
 							latencyMs
 					  )
 					: '';
-			label = sprintf(
-				/* translators: 1: number of models advertised. 2: optional latency suffix. */
-				__( 'Reachable · %1$d models%2$s', 'osaurus-ai-connector' ),
-				models.length,
-				latencyPart
-			);
+
+			const isHealthy = status === 'healthy';
+			dotEl = dot( isHealthy ? '#00A32A' : '#DBA617' );
+
+			if ( currentlyLoadedModel ) {
+				label = sprintf(
+					/* translators: 1: health status string. 2: currently loaded model ID. 3: optional latency suffix. */
+					__(
+						'%1$s · loaded: %2$s%3$s',
+						'osaurus-ai-connector'
+					),
+					status || __( 'reachable', 'osaurus-ai-connector' ),
+					currentlyLoadedModel,
+					latencyPart
+				);
+			} else {
+				label = sprintf(
+					/* translators: 1: health status string. 2: optional latency suffix. */
+					__(
+						'%1$s · no model loaded%2$s',
+						'osaurus-ai-connector'
+					),
+					status || __( 'reachable', 'osaurus-ai-connector' ),
+					latencyPart
+				);
+			}
 		}
 
-		statusRow = h(
-			HStack,
-			{ justify: 'flex-start', spacing: 2, expanded: false },
-			dotEl,
-			h(
-				'span',
-				{
-					style: {
-						fontSize: '12px',
-						color: modelsError ? '#D63638' : '#1D2327',
+		if ( dotEl ) {
+			// `<div>` here, not `<span>`, because the error label nests a
+			// `VStack` (which renders a div) for the two-line hint, and
+			// `<div>` inside `<span>` is invalid HTML. Display-flex via the
+			// HStack handles inline placement next to the dot regardless.
+			statusRow = h(
+				HStack,
+				{ justify: 'flex-start', spacing: 2, expanded: false },
+				dotEl,
+				h(
+					'div',
+					{
+						style: {
+							fontSize: '12px',
+							color: healthError ? '#D63638' : '#1D2327',
+						},
 					},
-				},
-				label
-			)
-		);
+					label
+				)
+			);
+		}
 	}
 
 	const urlField = h( TextControl, {

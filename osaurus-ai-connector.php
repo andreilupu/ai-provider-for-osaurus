@@ -299,34 +299,49 @@ add_action( 'init', __NAMESPACE__ . '\\register_base_url_setting' );
  *
  * @return void
  */
-function register_models_route(): void {
+function register_rest_routes(): void {
+	$base_url_arg = array(
+		'base_url' => array(
+			'type'              => 'string',
+			'required'          => false,
+			'sanitize_callback' => 'esc_url_raw',
+			'validate_callback' => static function ( $value ): bool {
+				if ( ! is_string( $value ) || '' === $value ) {
+					return false;
+				}
+				$scheme = wp_parse_url( $value, PHP_URL_SCHEME );
+				return in_array( $scheme, array( 'http', 'https' ), true );
+			},
+		),
+	);
+
+	$admin_only = static function (): bool {
+		return current_user_can( 'manage_options' );
+	};
+
 	register_rest_route(
 		'osaurus-ai-connector/v1',
 		'/models',
 		array(
 			'methods'             => 'GET',
-			'permission_callback' => static function (): bool {
-				return current_user_can( 'manage_options' );
-			},
-			'args'                => array(
-				'base_url' => array(
-					'type'              => 'string',
-					'required'          => false,
-					'sanitize_callback' => 'esc_url_raw',
-					'validate_callback' => static function ( $value ): bool {
-						if ( ! is_string( $value ) || '' === $value ) {
-							return false;
-						}
-						$scheme = wp_parse_url( $value, PHP_URL_SCHEME );
-						return in_array( $scheme, array( 'http', 'https' ), true );
-					},
-				),
-			),
+			'permission_callback' => $admin_only,
+			'args'                => $base_url_arg,
 			'callback'            => __NAMESPACE__ . '\\rest_get_models',
 		)
 	);
+
+	register_rest_route(
+		'osaurus-ai-connector/v1',
+		'/health',
+		array(
+			'methods'             => 'GET',
+			'permission_callback' => $admin_only,
+			'args'                => $base_url_arg,
+			'callback'            => __NAMESPACE__ . '\\rest_get_health',
+		)
+	);
 }
-add_action( 'rest_api_init', __NAMESPACE__ . '\\register_models_route' );
+add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
 
 /**
  * REST callback: returns the model IDs advertised by the configured Osaurus
@@ -344,16 +359,25 @@ add_action( 'rest_api_init', __NAMESPACE__ . '\\register_models_route' );
  *                                  unsaved URL before persisting it.
  * @return \WP_REST_Response|\WP_Error
  */
-function rest_get_models( \WP_REST_Request $request ) {
-	$override = $request->get_param( 'base_url' );
-	$base     = is_string( $override ) && '' !== $override ? rtrim( $override, '/' ) : get_base_url();
-
-	// Whitelist the override host / port for this single request so
-	// `wp_safe_remote_get()` does not reject it before our regular filters
-	// see it (those filters read from the saved option, which has not been
-	// updated yet when the admin is still editing).
-	$probe_host = wp_parse_url( $base, PHP_URL_HOST );
-	$probe_port = wp_parse_url( $base, PHP_URL_PORT );
+/**
+ * Performs an admin-side GET against the configured (or overridden) Osaurus
+ * server and returns the decoded JSON body.
+ *
+ * Centralises the host / port whitelisting that `wp_safe_remote_get()` needs
+ * to reach a loopback service on a non-standard port. Both REST callbacks in
+ * this file delegate the network plumbing here so behaviour stays in sync.
+ *
+ * @since 0.4.0
+ *
+ * @param string $base_url Sanitized base URL of the Osaurus server. Trailing
+ *                         slashes are tolerated and stripped.
+ * @param string $url      Full URL to fetch (e.g. `<base>/models`, `<root>/health`).
+ * @return array<string, mixed>|\WP_Error Decoded JSON body, or a WP_Error
+ *                                        with HTTP status 502 on failure.
+ */
+function probe_osaurus( string $base_url, string $url ) {
+	$probe_host = wp_parse_url( $base_url, PHP_URL_HOST );
+	$probe_port = wp_parse_url( $base_url, PHP_URL_PORT );
 
 	$allow_host = static function ( bool $external, string $host ) use ( $probe_host ): bool {
 		return ( $probe_host && $host === $probe_host ) ? true : $external;
@@ -367,7 +391,6 @@ function rest_get_models( \WP_REST_Request $request ) {
 	add_filter( 'http_request_host_is_external', $allow_host, 10, 2 );
 	add_filter( 'http_allowed_safe_ports', $allow_port );
 
-	$url      = trailingslashit( $base ) . 'models';
 	$response = wp_safe_remote_get(
 		$url,
 		array(
@@ -399,7 +422,42 @@ function rest_get_models( \WP_REST_Request $request ) {
 
 	$body    = wp_remote_retrieve_body( $response );
 	$decoded = json_decode( $body, true );
-	if ( ! is_array( $decoded ) || ! isset( $decoded['data'] ) || ! is_array( $decoded['data'] ) ) {
+	if ( ! is_array( $decoded ) ) {
+		return new \WP_Error(
+			'osaurus_malformed_response',
+			__( 'Osaurus returned a non-JSON or unexpected response.', 'osaurus-ai-connector' ),
+			array( 'status' => 502 )
+		);
+	}
+
+	return $decoded;
+}
+
+/**
+ * Resolves the base URL to probe, preferring an admin-supplied override over
+ * the persisted option so the Settings panel can probe an unsaved URL.
+ *
+ * @since 0.4.0
+ *
+ * @param \WP_REST_Request $request Incoming REST request.
+ * @return string Base URL with any trailing slash trimmed.
+ */
+function resolve_probe_base_url( \WP_REST_Request $request ): string {
+	$override = $request->get_param( 'base_url' );
+	return is_string( $override ) && '' !== $override
+		? rtrim( $override, '/' )
+		: get_base_url();
+}
+
+function rest_get_models( \WP_REST_Request $request ) {
+	$base    = resolve_probe_base_url( $request );
+	$decoded = probe_osaurus( $base, trailingslashit( $base ) . 'models' );
+
+	if ( is_wp_error( $decoded ) ) {
+		return $decoded;
+	}
+
+	if ( ! isset( $decoded['data'] ) || ! is_array( $decoded['data'] ) ) {
 		return new \WP_Error(
 			'osaurus_malformed_response',
 			__( 'Osaurus returned a response without the expected `data` array.', 'osaurus-ai-connector' ),
@@ -416,6 +474,61 @@ function rest_get_models( \WP_REST_Request $request ) {
 	sort( $ids );
 
 	return rest_ensure_response( array( 'models' => $ids ) );
+}
+
+/**
+ * REST callback: probes Osaurus's `/health` endpoint and returns a normalised
+ * status payload.
+ *
+ * Health lives at the server **root**, not under the configured `/v1` path,
+ * so we rebuild the URL from the base URL's scheme + host + port and discard
+ * the path component. Returns the upstream `status`, the currently loaded
+ * model (when Osaurus reports one), and the list of resident models so the
+ * admin UI can display a meaningful status row instead of a binary OK/fail.
+ *
+ * @since 0.4.0
+ *
+ * @param \WP_REST_Request $request Incoming REST request.
+ * @return \WP_REST_Response|\WP_Error
+ */
+function rest_get_health( \WP_REST_Request $request ) {
+	$base = resolve_probe_base_url( $request );
+
+	// Health is at server root: drop any configured path (`/v1`) and rebuild.
+	$scheme = wp_parse_url( $base, PHP_URL_SCHEME );
+	$host   = wp_parse_url( $base, PHP_URL_HOST );
+	$port   = wp_parse_url( $base, PHP_URL_PORT );
+	if ( ! $scheme || ! $host ) {
+		return new \WP_Error(
+			'osaurus_invalid_base_url',
+			__( 'The configured base URL is missing a scheme or host.', 'osaurus-ai-connector' ),
+			array( 'status' => 400 )
+		);
+	}
+	$root        = $scheme . '://' . $host . ( $port ? ':' . (int) $port : '' );
+	$health_url  = $root . '/health';
+	$decoded     = probe_osaurus( $base, $health_url );
+
+	if ( is_wp_error( $decoded ) ) {
+		return $decoded;
+	}
+
+	$loaded = array();
+	if ( isset( $decoded['loaded'] ) && is_array( $decoded['loaded'] ) ) {
+		foreach ( $decoded['loaded'] as $item ) {
+			if ( is_string( $item ) && '' !== $item ) {
+				$loaded[] = $item;
+			}
+		}
+	}
+
+	return rest_ensure_response(
+		array(
+			'status'        => isset( $decoded['status'] ) && is_string( $decoded['status'] ) ? $decoded['status'] : 'unknown',
+			'current_model' => isset( $decoded['current_model'] ) && is_string( $decoded['current_model'] ) ? $decoded['current_model'] : null,
+			'loaded'        => $loaded,
+		)
+	);
 }
 
 /**

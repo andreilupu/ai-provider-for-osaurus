@@ -124,13 +124,15 @@ class OsaurusProvider extends AbstractApiProvider {
 		if ( version_compare( AiClient::VERSION, '1.2.0', '>=' ) ) {
 			// The WP 7.0 Connectors UI currently only renders rows for api_key
 			// providers, so we advertise api_key auth even though Osaurus does
-			// not require a key. The description calls this out so users do
-			// not waste time looking up a credential that doesn't exist.
-			$description = 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. No API key required — leave the field blank.';
+			// not require a key. The description doubles as onboarding copy:
+			// it points users at the Osaurus install (an external Mac app, not
+			// an account they need to sign up for) and clarifies that there
+			// is no credential to look up.
+			$description = 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. Requires the Osaurus app to be installed and running on this Mac — download it from https://osaurus.ai. No API key needed.';
 
 			// Localisable on WordPress; raw string when the SDK is used outside WP (e.g. in tests / CLI).
 			$args[] = function_exists( '__' )
-				? __( 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. No API key required — leave the field blank.', 'osaurus-ai-connector' )
+				? __( 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. Requires the Osaurus app to be installed and running on this Mac — download it from https://osaurus.ai. No API key needed.', 'osaurus-ai-connector' )
 				: $description;
 		}
 
