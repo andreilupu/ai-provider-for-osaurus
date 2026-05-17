@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Osaurus AI Connector
+ * Plugin Name:       AI Provider for Osaurus
  * Plugin URI:        https://github.com/andreilupu/osaurus-ai-connector
  * Description:       Registers Osaurus (local Apple Silicon LLM runtime) as a provider for the WordPress AI Client.
  * Requires at least: 7.0
@@ -11,7 +11,7 @@
  * Author URI:        https://github.com/andreilupu
  * License:           GPL-2.0-or-later
  * License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
- * Text Domain:       osaurus-ai-connector
+ * Text Domain:       ai-provider-for-osaurus
  *
  * This file is the plugin entry point. It wires the Osaurus provider into the
  * WordPress AI Client on `init` and adds the HTTP plumbing WordPress needs in
@@ -258,8 +258,8 @@ function register_base_url_setting(): void {
 		BASE_URL_OPTION,
 		array(
 			'type'              => 'string',
-			'label'             => __( 'Osaurus Server URL', 'osaurus-ai-connector' ),
-			'description'       => __( 'Base URL of your local Osaurus server, including the /v1 path.', 'osaurus-ai-connector' ),
+			'label'             => __( 'Osaurus Server URL', 'ai-provider-for-osaurus' ),
+			'description'       => __( 'Base URL of your local Osaurus server, including the /v1 path.', 'ai-provider-for-osaurus' ),
 			'default'           => DEFAULT_BASE_URL,
 			'show_in_rest'      => true,
 			'sanitize_callback' => 'esc_url_raw',
@@ -271,8 +271,8 @@ function register_base_url_setting(): void {
 		DEFAULT_MODEL_OPTION,
 		array(
 			'type'              => 'string',
-			'label'             => __( 'Osaurus default model', 'osaurus-ai-connector' ),
-			'description'       => __( 'Model ID to use when callers do not specify one explicitly.', 'osaurus-ai-connector' ),
+			'label'             => __( 'Osaurus default model', 'ai-provider-for-osaurus' ),
+			'description'       => __( 'Model ID to use when callers do not specify one explicitly.', 'ai-provider-for-osaurus' ),
 			'default'           => '',
 			'show_in_rest'      => true,
 			'sanitize_callback' => 'sanitize_text_field',
@@ -320,7 +320,7 @@ function register_rest_routes(): void {
 	};
 
 	register_rest_route(
-		'osaurus-ai-connector/v1',
+		'ai-provider-for-osaurus/v1',
 		'/models',
 		array(
 			'methods'             => 'GET',
@@ -331,7 +331,7 @@ function register_rest_routes(): void {
 	);
 
 	register_rest_route(
-		'osaurus-ai-connector/v1',
+		'ai-provider-for-osaurus/v1',
 		'/health',
 		array(
 			'methods'             => 'GET',
@@ -415,7 +415,7 @@ function probe_osaurus( string $base_url, string $url ) {
 		return new \WP_Error(
 			'osaurus_bad_response',
 			/* translators: %d: HTTP status code returned by Osaurus. */
-			sprintf( __( 'Osaurus responded with HTTP %d.', 'osaurus-ai-connector' ), $code ),
+			sprintf( __( 'Osaurus responded with HTTP %d.', 'ai-provider-for-osaurus' ), $code ),
 			array( 'status' => 502 )
 		);
 	}
@@ -425,7 +425,7 @@ function probe_osaurus( string $base_url, string $url ) {
 	if ( ! is_array( $decoded ) ) {
 		return new \WP_Error(
 			'osaurus_malformed_response',
-			__( 'Osaurus returned a non-JSON or unexpected response.', 'osaurus-ai-connector' ),
+			__( 'Osaurus returned a non-JSON or unexpected response.', 'ai-provider-for-osaurus' ),
 			array( 'status' => 502 )
 		);
 	}
@@ -460,7 +460,7 @@ function rest_get_models( \WP_REST_Request $request ) {
 	if ( ! isset( $decoded['data'] ) || ! is_array( $decoded['data'] ) ) {
 		return new \WP_Error(
 			'osaurus_malformed_response',
-			__( 'Osaurus returned a response without the expected `data` array.', 'osaurus-ai-connector' ),
+			__( 'Osaurus returned a response without the expected `data` array.', 'ai-provider-for-osaurus' ),
 			array( 'status' => 502 )
 		);
 	}
@@ -501,7 +501,7 @@ function rest_get_health( \WP_REST_Request $request ) {
 	if ( ! $scheme || ! $host ) {
 		return new \WP_Error(
 			'osaurus_invalid_base_url',
-			__( 'The configured base URL is missing a scheme or host.', 'osaurus-ai-connector' ),
+			__( 'The configured base URL is missing a scheme or host.', 'ai-provider-for-osaurus' ),
 			array( 'status' => 400 )
 		);
 	}
@@ -561,7 +561,7 @@ function enqueue_connector_settings_module( string $hook_suffix ): void {
 		return;
 	}
 
-	$handle = 'osaurus-ai-connector-settings';
+	$handle = 'ai-provider-for-osaurus-settings';
 
 	wp_register_script_module(
 		$handle,

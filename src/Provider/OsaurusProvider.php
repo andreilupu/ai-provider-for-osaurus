@@ -132,7 +132,7 @@ class OsaurusProvider extends AbstractApiProvider {
 
 			// Localisable on WordPress; raw string when the SDK is used outside WP (e.g. in tests / CLI).
 			$args[] = function_exists( '__' )
-				? __( 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. Requires the Osaurus app to be installed and running on this Mac — download it from https://osaurus.ai. No API key needed.', 'osaurus-ai-connector' )
+				? __( 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. Requires the Osaurus app to be installed and running on this Mac — download it from https://osaurus.ai. No API key needed.', 'ai-provider-for-osaurus' )
 				: $description;
 		}
 

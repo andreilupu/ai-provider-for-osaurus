@@ -1,6 +1,6 @@
-=== Osaurus AI Connector ===
+=== AI Provider for Osaurus ===
 Contributors: euthelup
-Tags: ai, llm, osaurus, ai-client, local-ai
+Tags: ai, connector, llm, local-ai, osaurus
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
@@ -12,7 +12,7 @@ Registers Osaurus, a local Apple Silicon LLM runtime, as a provider for the Word
 
 == Description ==
 
-Osaurus AI Connector wires the [Osaurus](https://osaurus.ai) local LLM runtime into the WordPress AI Client that ships with WordPress 7.0.
+AI Provider for Osaurus wires the [Osaurus](https://osaurus.ai) local LLM runtime into the WordPress AI Client that ships with WordPress 7.0.
 
 After activation, any plugin that calls `wp_ai_client_prompt()` (Gutenberg AI features, official provider plugins, third-party code) can route prompts to Osaurus running on the same machine. Prompts never leave the local network.
 
@@ -82,7 +82,7 @@ Osaurus documentation: [docs.osaurus.ai](https://docs.osaurus.ai)
 1. Install and start [Osaurus](https://osaurus.ai) on your Mac (Apple Silicon required).
 2. Confirm Osaurus is reachable, e.g. `curl http://127.0.0.1:1337/v1/models`.
 3. Install this plugin from the WordPress.org plugin directory, or upload the plugin folder to `wp-content/plugins/`.
-4. Activate **Osaurus AI Connector** on the **Plugins** screen.
+4. Activate **AI Provider for Osaurus** on the **Plugins** screen.
 5. Visit **Settings &rarr; Connectors**. The Osaurus row should report as connected once a model list is available.
 
 If WordPress and Osaurus run on the same host but on different ports, no further configuration is required. If you run WordPress inside Docker (e.g. `@wordpress/env`), the default Docker-aware URL works as-is.

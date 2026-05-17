@@ -1,5 +1,5 @@
 /**
- * Osaurus AI Connector — admin script module.
+ * AI Provider for Osaurus — admin script module.
  *
  * Registers a custom React render for the Osaurus connector row on the
  * Connectors admin screen via the experimental client-side registration
@@ -48,13 +48,13 @@ const { addQueryArgs } = window.wp.url;
 
 /**
  * Option name used to persist the base URL. Must match `BASE_URL_OPTION`
- * declared in `osaurus-ai-connector.php`.
+ * declared in `ai-provider-for-osaurus.php`.
  */
 const BASE_URL_OPTION = 'osaurus_ai_connector_base_url';
 
 /**
  * Option name used to persist the user-selected default model. Must match
- * `DEFAULT_MODEL_OPTION` declared in `osaurus-ai-connector.php`.
+ * `DEFAULT_MODEL_OPTION` declared in `ai-provider-for-osaurus.php`.
  */
 const DEFAULT_MODEL_OPTION = 'osaurus_ai_connector_default_model';
 
@@ -113,7 +113,7 @@ function OsaurusSettings() {
 			const startedAt = now();
 
 			apiFetch( {
-				path: addQueryArgs( '/osaurus-ai-connector/v1/health', {
+				path: addQueryArgs( '/ai-provider-for-osaurus/v1/health', {
 					base_url: currentValue,
 				} ),
 			} )
@@ -133,7 +133,7 @@ function OsaurusSettings() {
 					setLatencyMs( null );
 					setHealthError(
 						err?.message ||
-							__( 'Could not reach Osaurus.', 'osaurus-ai-connector' )
+							__( 'Could not reach Osaurus.', 'ai-provider-for-osaurus' )
 					);
 					setIsProbingHealth( false );
 				} );
@@ -156,7 +156,7 @@ function OsaurusSettings() {
 			setModelsError( '' );
 
 			apiFetch( {
-				path: addQueryArgs( '/osaurus-ai-connector/v1/models', {
+				path: addQueryArgs( '/ai-provider-for-osaurus/v1/models', {
 					base_url: currentValue,
 				} ),
 			} )
@@ -177,7 +177,7 @@ function OsaurusSettings() {
 					setModels( [] );
 					setModelsError(
 						err?.message ||
-							__( 'Could not reach Osaurus.', 'osaurus-ai-connector' )
+							__( 'Could not reach Osaurus.', 'ai-provider-for-osaurus' )
 					);
 					setIsLoadingModels( false );
 				} );
@@ -191,11 +191,11 @@ function OsaurusSettings() {
 
 	let buttonLabel;
 	if ( isExpanded ) {
-		buttonLabel = __( 'Cancel', 'osaurus-ai-connector' );
+		buttonLabel = __( 'Cancel', 'ai-provider-for-osaurus' );
 	} else if ( isConnected ) {
-		buttonLabel = __( 'Edit', 'osaurus-ai-connector' );
+		buttonLabel = __( 'Edit', 'ai-provider-for-osaurus' );
 	} else {
-		buttonLabel = __( 'Configure', 'osaurus-ai-connector' );
+		buttonLabel = __( 'Configure', 'ai-provider-for-osaurus' );
 	}
 
 	const toggleButton = h(
@@ -255,7 +255,7 @@ function OsaurusSettings() {
 		let label;
 		if ( isProbingHealth ) {
 			dotEl = h( Spinner, null );
-			label = __( 'Testing connection…', 'osaurus-ai-connector' );
+			label = __( 'Testing connection…', 'ai-provider-for-osaurus' );
 		} else if ( healthError ) {
 			dotEl = dot( '#D63638' );
 			// Two-line label: the raw server-side error stays on top so power
@@ -272,7 +272,7 @@ function OsaurusSettings() {
 					null,
 					sprintf(
 						/* translators: %s: error message returned by the server. */
-						__( 'Unreachable — %s', 'osaurus-ai-connector' ),
+						__( 'Unreachable — %s', 'ai-provider-for-osaurus' ),
 						healthError
 					)
 				),
@@ -281,7 +281,7 @@ function OsaurusSettings() {
 					{ style: { color: '#646970' } },
 					__(
 						'Have you installed Osaurus and started the app? Download it at ',
-						'osaurus-ai-connector'
+						'ai-provider-for-osaurus'
 					),
 					h(
 						'a',
@@ -300,7 +300,7 @@ function OsaurusSettings() {
 				latencyMs !== null
 					? sprintf(
 							/* translators: %d: round-trip latency in milliseconds. */
-							__( ' · %dms', 'osaurus-ai-connector' ),
+							__( ' · %dms', 'ai-provider-for-osaurus' ),
 							latencyMs
 					  )
 					: '';
@@ -313,9 +313,9 @@ function OsaurusSettings() {
 					/* translators: 1: health status string. 2: currently loaded model ID. 3: optional latency suffix. */
 					__(
 						'%1$s · loaded: %2$s%3$s',
-						'osaurus-ai-connector'
+						'ai-provider-for-osaurus'
 					),
-					status || __( 'reachable', 'osaurus-ai-connector' ),
+					status || __( 'reachable', 'ai-provider-for-osaurus' ),
 					currentlyLoadedModel,
 					latencyPart
 				);
@@ -324,9 +324,9 @@ function OsaurusSettings() {
 					/* translators: 1: health status string. 2: optional latency suffix. */
 					__(
 						'%1$s · no model loaded%2$s',
-						'osaurus-ai-connector'
+						'ai-provider-for-osaurus'
 					),
-					status || __( 'reachable', 'osaurus-ai-connector' ),
+					status || __( 'reachable', 'ai-provider-for-osaurus' ),
 					latencyPart
 				);
 			}
@@ -359,14 +359,14 @@ function OsaurusSettings() {
 		__next40pxDefaultSize: true,
 		__nextHasNoMarginBottom: true,
 		type: 'url',
-		label: __( 'Server URL', 'osaurus-ai-connector' ),
+		label: __( 'Server URL', 'ai-provider-for-osaurus' ),
 		value: currentValue,
 		onChange: ( next ) => edit( { [ BASE_URL_OPTION ]: next } ),
 		placeholder: 'http://127.0.0.1:1337/v1',
 		disabled: isSaving,
 		help: __(
 			'Base URL of your local Osaurus server, including the /v1 path.',
-			'osaurus-ai-connector'
+			'ai-provider-for-osaurus'
 		),
 	} );
 
@@ -381,18 +381,18 @@ function OsaurusSettings() {
 	 */
 	const presets = [
 		{
-			label: __( 'Bare-metal (127.0.0.1)', 'osaurus-ai-connector' ),
+			label: __( 'Bare-metal (127.0.0.1)', 'ai-provider-for-osaurus' ),
 			description: __(
 				'WordPress and Osaurus on the same Mac (Studio, MAMP, Valet, Local, native PHP).',
-				'osaurus-ai-connector'
+				'ai-provider-for-osaurus'
 			),
 			url: 'http://127.0.0.1:1337/v1',
 		},
 		{
-			label: __( 'Docker (host.docker.internal)', 'osaurus-ai-connector' ),
+			label: __( 'Docker (host.docker.internal)', 'ai-provider-for-osaurus' ),
 			description: __(
 				'WordPress in Docker on the same Mac (wp-env, DDEV, Lando, Docker Desktop).',
-				'osaurus-ai-connector'
+				'ai-provider-for-osaurus'
 			),
 			url: 'http://host.docker.internal:1337/v1',
 		},
@@ -428,7 +428,7 @@ function OsaurusSettings() {
 					color: '#646970',
 				},
 			},
-			__( 'Quick presets', 'osaurus-ai-connector' )
+			__( 'Quick presets', 'ai-provider-for-osaurus' )
 		),
 		h( HStack, { justify: 'flex-start', spacing: 2 }, ...presetButtons )
 	);
@@ -454,7 +454,7 @@ function OsaurusSettings() {
 			h(
 				'span',
 				{ style: { fontSize: '12px', color: '#646970' } },
-				__( 'Fetching models from Osaurus…', 'osaurus-ai-connector' )
+				__( 'Fetching models from Osaurus…', 'ai-provider-for-osaurus' )
 			)
 		);
 	} else if ( modelsError ) {
@@ -467,14 +467,14 @@ function OsaurusSettings() {
 		const options = [
 			{
 				value: '',
-				label: __( '— No default —', 'osaurus-ai-connector' ),
+				label: __( '— No default —', 'ai-provider-for-osaurus' ),
 			},
 			...models.map( ( id ) => ( { value: id, label: id } ) ),
 		];
 		modelControl = h( SelectControl, {
 			__next40pxDefaultSize: true,
 			__nextHasNoMarginBottom: true,
-			label: __( 'Default model', 'osaurus-ai-connector' ),
+			label: __( 'Default model', 'ai-provider-for-osaurus' ),
 			value: currentModel,
 			options,
 			disabled: isSaving || models.length === 0,
@@ -483,11 +483,11 @@ function OsaurusSettings() {
 				models.length === 0
 					? __(
 							'Osaurus responded but advertised no models. Load one into Osaurus first, then reopen this panel.',
-							'osaurus-ai-connector'
+							'ai-provider-for-osaurus'
 					  )
 					: __(
 							'Optional. Used by consumer plugins as a fallback when no model is specified in the prompt.',
-							'osaurus-ai-connector'
+							'ai-provider-for-osaurus'
 					  ),
 		} );
 	}
@@ -509,12 +509,12 @@ function OsaurusSettings() {
 				}
 			},
 		},
-		__( 'Save', 'osaurus-ai-connector' )
+		__( 'Save', 'ai-provider-for-osaurus' )
 	);
 
 	return h(
 		VStack,
-		{ spacing: 4, className: 'osaurus-ai-connector-settings' },
+		{ spacing: 4, className: 'ai-provider-for-osaurus-settings' },
 		urlField,
 		statusRow,
 		presetRow,
