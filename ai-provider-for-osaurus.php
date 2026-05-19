@@ -1,12 +1,12 @@
 <?php
 /**
  * Plugin Name:       AI Provider for Osaurus
- * Plugin URI:        https://github.com/andreilupu/osaurus-ai-connector
+ * Plugin URI:        https://github.com/andreilupu/ai-provider-for-osaurus
  * Description:       Registers Osaurus (local Apple Silicon LLM runtime) as a provider for the WordPress AI Client.
  * Requires at least: 7.0
  * Tested up to:      7.0
  * Requires PHP:      7.4
- * Version:           0.4.0
+ * Version:           0.4.1
  * Author:            Andrei Lupu
  * Author URI:        https://github.com/andreilupu
  * License:           GPL-2.0-or-later
@@ -47,7 +47,7 @@ const PLUGIN_FILE = __FILE__;
  * @since 0.1.0
  * @var string
  */
-const PLUGIN_VERSION = '0.4.0';
+const PLUGIN_VERSION = '0.4.1';
 
 /**
  * Default Osaurus base URL, used when no constant or option is provided.

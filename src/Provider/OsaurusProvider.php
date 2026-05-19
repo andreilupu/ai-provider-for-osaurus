@@ -25,6 +25,7 @@ use OsaurusAi\Connector\Metadata\OsaurusModelMetadataDirectory;
 use OsaurusAi\Connector\Models\OsaurusTextGenerationModel;
 
 use function OsaurusAi\Connector\get_base_url;
+use const OsaurusAi\Connector\PLUGIN_FILE;
 
 /**
  * Provider class for Osaurus.
@@ -134,6 +135,13 @@ class OsaurusProvider extends AbstractApiProvider {
 			$args[] = function_exists( '__' )
 				? __( 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. Requires the Osaurus app to be installed and running on this Mac — download it from https://osaurus.ai. No API key needed.', 'ai-provider-for-osaurus' )
 				: $description;
+		}
+
+		// Provider logo, supported by SDK ≥ 1.3.0 (Connectors UI renders it next
+		// to the provider name). Skipped on older SDK builds — the optional
+		// constructor arg simply does not exist there.
+		if ( version_compare( AiClient::VERSION, '1.3.0', '>=' ) ) {
+			$args[] = plugin_dir_path( PLUGIN_FILE ) . 'assets/img/osaurus.svg';
 		}
 
 		return new ProviderMetadata( ...$args );

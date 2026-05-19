@@ -4,7 +4,7 @@ Tags: ai, connector, llm, local-ai, osaurus
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.4.0
+Stable tag: 0.4.1
 License: GPL-2.0-or-later
 License URI: https://spdx.org/licenses/GPL-2.0-or-later.html
 
@@ -60,22 +60,35 @@ WordPress can run in many places &mdash; the right base URL depends on how it re
 
 The fastest way to confirm a URL works from the WordPress host: run `curl <base-url>/models` from the same shell environment WordPress runs in. A JSON list back means the connector will work.
 
-= External services =
-
-This plugin sends data **only to the Osaurus server you configure** &mdash; by default a process running on `127.0.0.1` on the same machine as WordPress. No data is sent to any third-party service operated by the plugin author.
-
-When you call `wp_ai_client_prompt()` (or any feature in another plugin that uses the AI Client and routes through Osaurus), the following is sent over HTTP to the configured Osaurus URL:
-
-* The prompt text and conversation history.
-* Model name, sampling parameters (temperature, top_p, max tokens, etc.).
-* Any tool / function declarations or JSON schema you supplied.
-
-The plugin also fetches `GET {base_url}/models` to populate the model picker.
-
-If you point `OSAURUS_BASE_URL` at a remote Osaurus instance you operate, the same data will be sent to that host. The plugin makes no calls to any other endpoint.
-
 Osaurus project home: [osaurus.ai](https://osaurus.ai)
 Osaurus documentation: [docs.osaurus.ai](https://docs.osaurus.ai)
+
+== External services ==
+
+This plugin connects to an Osaurus HTTP server &mdash; a local LLM runtime that you install and run yourself on the same machine as WordPress (or on a host you operate). The plugin is useless without it: every text-generation request from the WordPress AI Client is routed to this server.
+
+**What the service is and what it is used for**
+
+Osaurus is a local Apple Silicon LLM runtime (an OpenAI-compatible HTTP server) that you run on your own hardware. This plugin forwards prompts to it so WordPress can perform text generation, chat, tool calls, and structured JSON output without sending data to any cloud provider.
+
+**Where the data is sent**
+
+The plugin only contacts the host and port resolved from the `OSAURUS_BASE_URL` constant, the `osaurus_ai_connector_base_url` option, or the built-in default. The default targets are:
+
+* `http://127.0.0.1:1337/v1` &mdash; used when WordPress and Osaurus run on the same machine (bare-metal: Studio, MAMP, Valet, Local, native PHP).
+* `http://host.docker.internal:1337/v1` &mdash; used when WordPress runs inside Docker on the same Mac (`@wordpress/env`, DDEV, Lando, Docker Desktop). This is the plugin's built-in default and is resolved by Docker to the host machine.
+
+If you change the URL, the plugin will only contact the host and port you configure. The plugin never contacts any third-party endpoint operated by the plugin author, Osaurus project, or any other party.
+
+**What data is sent and when**
+
+* When any plugin (including WordPress core) calls `wp_ai_client_prompt()` and routes through Osaurus, the plugin sends an HTTPS/HTTP `POST` to `{base_url}/chat/completions` with: the prompt text, the conversation history you supplied, the model ID, sampling parameters (temperature, top_p, max tokens, etc.), and any tool / function declarations or JSON schemas you supplied.
+* When an admin opens **Settings &rarr; Connectors**, the plugin sends a `GET {base_url}/models` to populate the model picker and a `GET {root_url}/health` to display a connection status indicator. Both run only for users with `manage_options` and are triggered by user actions in wp-admin.
+* No telemetry, analytics, or background requests are sent.
+
+**Terms of service and privacy policy**
+
+Osaurus is open-source software you self-host. There is no third-party service operator collecting your data. Osaurus documentation and source: [osaurus.ai](https://osaurus.ai) and [docs.osaurus.ai](https://docs.osaurus.ai). If you point the plugin at a remote Osaurus server operated by someone else (e.g. a hosted Mac mini), the operator of that server is the data recipient and is governed by the terms you have with them.
 
 == Installation ==
 
@@ -120,6 +133,10 @@ Confirm Osaurus is running and reachable from the host running WordPress. If you
 
 == Changelog ==
 
+= 0.4.1 =
+* New: provider logo wired through `ProviderMetadata::$logoPath` so the Connectors UI shows the Osaurus mark next to the provider name (SDK ≥ 1.3.0).
+* Docs: expanded the External services section in readme to document the Osaurus host targets (`127.0.0.1:1337`, `host.docker.internal:1337`), what data is sent, and when.
+
 = 0.4.0 =
 * New: live "Reachable" status indicator under the URL field, with round-trip latency.
 * New: quick-pick preset buttons for bare-metal (`127.0.0.1`) and Docker (`host.docker.internal`) setups.
@@ -139,6 +156,9 @@ Confirm Osaurus is running and reachable from the host running WordPress. If you
 * Initial release: registers Osaurus as a WordPress AI Client provider with text generation, chat history, tool calls, structured JSON output, and streaming.
 
 == Upgrade Notice ==
+
+= 0.4.1 =
+Documentation-only update. No data migration required.
 
 = 0.4.0 =
 Adds a connection status indicator, preset buttons, and a default-model picker. No data migration required.
