@@ -4,7 +4,7 @@ Tags: ai, connector, llm, local-ai, osaurus
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.4.1
+Stable tag: 0.4.2
 License: GPL-2.0-or-later
 License URI: https://spdx.org/licenses/GPL-2.0-or-later.html
 
@@ -43,7 +43,7 @@ The plugin resolves the Osaurus base URL in this order (first match wins):
 
 1. `OSAURUS_BASE_URL` PHP constant defined in `wp-config.php`.
 2. `osaurus_ai_connector_base_url` option, settable from **Settings &rarr; Connectors** in wp-admin.
-3. Default: `http://host.docker.internal:1337/v1` (works for `@wordpress/env` Docker setups).
+3. Default: `http://127.0.0.1:1337/v1` (works out of the box for bare-metal WordPress on the same Mac as Osaurus; Docker setups must override).
 
 = Pick the right URL for your setup =
 
@@ -75,8 +75,8 @@ Osaurus is a local Apple Silicon LLM runtime (an OpenAI-compatible HTTP server) 
 
 The plugin only contacts the host and port resolved from the `OSAURUS_BASE_URL` constant, the `osaurus_ai_connector_base_url` option, or the built-in default. The default targets are:
 
-* `http://127.0.0.1:1337/v1` &mdash; used when WordPress and Osaurus run on the same machine (bare-metal: Studio, MAMP, Valet, Local, native PHP).
-* `http://host.docker.internal:1337/v1` &mdash; used when WordPress runs inside Docker on the same Mac (`@wordpress/env`, DDEV, Lando, Docker Desktop). This is the plugin's built-in default and is resolved by Docker to the host machine.
+* `http://127.0.0.1:1337/v1` &mdash; used when WordPress and Osaurus run on the same machine (bare-metal: Studio, MAMP, Valet, Local, native PHP). This is the plugin's built-in default.
+* `http://host.docker.internal:1337/v1` &mdash; used when WordPress runs inside Docker on the same Mac (`@wordpress/env`, DDEV, Lando, Docker Desktop). Docker resolves this hostname to the host machine; switch to it from **Settings &rarr; Connectors** or set `OSAURUS_BASE_URL` in your environment config.
 
 If you change the URL, the plugin will only contact the host and port you configure. The plugin never contacts any third-party endpoint operated by the plugin author, Osaurus project, or any other party.
 
@@ -98,7 +98,7 @@ Osaurus is open-source software you self-host. There is no third-party service o
 4. Activate **AI Provider for Osaurus** on the **Plugins** screen.
 5. Visit **Settings &rarr; Connectors**. The Osaurus row should report as connected once a model list is available.
 
-If WordPress and Osaurus run on the same host but on different ports, no further configuration is required. If you run WordPress inside Docker (e.g. `@wordpress/env`), the default Docker-aware URL works as-is.
+If WordPress and Osaurus run on the same host, no further configuration is required &mdash; the default `http://127.0.0.1:1337/v1` works as-is. If you run WordPress inside Docker (e.g. `@wordpress/env`), switch the URL to `http://host.docker.internal:1337/v1` from **Settings &rarr; Connectors** or set `OSAURUS_BASE_URL` in your environment config.
 
 == Frequently Asked Questions ==
 
@@ -124,7 +124,7 @@ Not supported. Osaurus only exposes text / chat completions today. For images, i
 
 = I get an `http_request_failed` error. =
 
-Confirm Osaurus is running and reachable from the host running WordPress. If you run WordPress inside Docker, the host is `host.docker.internal`, not `127.0.0.1`.
+Confirm Osaurus is running and reachable from the host running WordPress. If you run WordPress inside Docker, change the URL to `http://host.docker.internal:1337/v1` &mdash; the default `127.0.0.1` only works for bare-metal WordPress.
 
 == Screenshots ==
 
@@ -132,6 +132,16 @@ Confirm Osaurus is running and reachable from the host running WordPress. If you
 2. Model picker populated from the Osaurus `/v1/models` endpoint.
 
 == Changelog ==
+
+= 0.4.2 =
+* Fix: replaced `str_contains()` with `strpos()` in the model sort so the plugin actually runs on PHP 7.4 as the header advertises.
+* Fix: wrapped the `wp_safe_remote_get()` call in `probe_osaurus()` with try/finally so the host / port whitelist filters are always reverted, even if the HTTP call throws.
+* Fix: `uninstall.php` now passes `number => 0` to `get_sites()` so multisite networks larger than 100 sites are cleaned in full.
+* Change: default base URL switched from `host.docker.internal` to `127.0.0.1` so bare-metal installs work out of the box. Docker setups should now switch to the Docker preset from **Settings &rarr; Connectors** or set `OSAURUS_BASE_URL`. Existing installs with the option already set are unaffected.
+* Code: deduplicated the provider description string; the `function_exists( '__' )` fallback is removed because the class is autoloaded inside WordPress.
+* Code: removed the dead `tools/mu-osaurus-dev.php` dev helper — the main plugin's `http_request_host_is_external` filter already covers the wp-env case it was meant to address.
+* Fix: hooked the `wpai_has_ai_credentials` filter so the **AI** plugin (`wp-content/plugins/ai`) treats Osaurus as configured even though the auto-generated API-key option is empty &mdash; without this, AI features reported "no connector active" while Osaurus was registered and reachable.
+* New: `uninstall.php` removes both plugin options on uninstall, including across all sites of a multisite network.
 
 = 0.4.1 =
 * New: provider logo wired through `ProviderMetadata::$logoPath` so the Connectors UI shows the Osaurus mark next to the provider name (SDK ≥ 1.3.0).
@@ -141,7 +151,7 @@ Confirm Osaurus is running and reachable from the host running WordPress. If you
 * New: live "Reachable" status indicator under the URL field, with round-trip latency.
 * New: quick-pick preset buttons for bare-metal (`127.0.0.1`) and Docker (`host.docker.internal`) setups.
 * New: default-model dropdown populated from the configured Osaurus server.
-* New: `GET /osaurus-ai-connector/v1/models` REST route (admin-only) that proxies the Osaurus models list and accepts a `base_url` override for pre-save probing.
+* New: `GET /ai-provider-for-osaurus/v1/models` REST route (admin-only) that proxies the Osaurus models list and accepts a `base_url` override for pre-save probing.
 * New: `osaurus_ai_connector_default_model` option, readable by consumer plugins as a fallback model.
 
 = 0.3.0 =
@@ -156,6 +166,9 @@ Confirm Osaurus is running and reachable from the host running WordPress. If you
 * Initial release: registers Osaurus as a WordPress AI Client provider with text generation, chat history, tool calls, structured JSON output, and streaming.
 
 == Upgrade Notice ==
+
+= 0.4.2 =
+Bug-fix release: restores PHP 7.4 compatibility, hardens HTTP filter cleanup, adds an uninstall handler. The default base URL also moves from `host.docker.internal` to `127.0.0.1` &mdash; if you rely on the default in a Docker setup, switch to the Docker preset in **Settings &rarr; Connectors** or set `OSAURUS_BASE_URL`. No data migration required.
 
 = 0.4.1 =
 Documentation-only update. No data migration required.

@@ -6,7 +6,7 @@
  * Requires at least: 7.0
  * Tested up to:      7.0
  * Requires PHP:      7.4
- * Version:           0.4.1
+ * Version:           0.4.2
  * Author:            Andrei Lupu
  * Author URI:        https://github.com/andreilupu
  * License:           GPL-2.0-or-later
@@ -47,20 +47,23 @@ const PLUGIN_FILE = __FILE__;
  * @since 0.1.0
  * @var string
  */
-const PLUGIN_VERSION = '0.4.1';
+const PLUGIN_VERSION = '0.4.2';
 
 /**
  * Default Osaurus base URL, used when no constant or option is provided.
  *
- * Uses `host.docker.internal` so that a WordPress instance running inside
- * `@wordpress/env` (Docker) can reach an Osaurus server on the macOS host.
- * Bare-metal installs should override via the `OSAURUS_BASE_URL` constant or
- * by setting the `osaurus_ai_connector_base_url` option to `http://127.0.0.1:1337/v1`.
+ * Targets loopback so the plugin works out of the box on bare-metal WordPress
+ * installs (Studio, MAMP, Valet, Local, native PHP). Docker setups
+ * (`@wordpress/env`, DDEV, Lando) cannot reach the host on `127.0.0.1` and
+ * must override via the `OSAURUS_BASE_URL` constant or by selecting the
+ * Docker preset in **Settings → Connectors**
+ * (`http://host.docker.internal:1337/v1`). The bundled `.wp-env.json` already
+ * sets the constant for the dev environment.
  *
  * @since 0.1.0
  * @var string
  */
-const DEFAULT_BASE_URL = 'http://host.docker.internal:1337/v1';
+const DEFAULT_BASE_URL = 'http://127.0.0.1:1337/v1';
 
 /**
  * Option name used to persist a custom base URL from the admin UI.
@@ -110,7 +113,7 @@ function get_base_url(): string {
 		return rtrim( $stored, '/' );
 	}
 
-	// 3. Default — assumes wp-env + Osaurus running on the host.
+	// 3. Default — bare-metal loopback. Docker setups should override.
 	return DEFAULT_BASE_URL;
 }
 
@@ -152,13 +155,13 @@ add_action( 'init', __NAMESPACE__ . '\\register_provider', 5 );
  * Connectors admin UI renders the row as connected and downstream features
  * (image generation gating, prompt routing) behave correctly.
  *
- * Hooked to `init` at priority 15 so it runs AFTER:
- *   - `register_provider()` (priority 5 in this plugin).
- *   - `_wp_connectors_pass_default_keys_to_ai_client()` (priority 20 in core).
- *
- * The priority 15 placement is the sweet spot: after our provider exists,
- * but before the core pass step would have overwritten any user-provided
- * key from the database.
+ * Hooked to `init` at priority 15 — after our own `register_provider()`
+ * (priority 5) so the provider exists, but before
+ * `_wp_connectors_pass_default_keys_to_ai_client()` (priority 20 in core).
+ * The `null` check below means core's later pass still wins when a real key
+ * is stored in the database; we only leave the empty placeholder in place
+ * when no key exists, which is what makes the Connectors row render as
+ * "configured" for Osaurus.
  *
  * @since 0.1.0
  *
@@ -186,6 +189,39 @@ function register_fallback_auth(): void {
 	);
 }
 add_action( 'init', __NAMESPACE__ . '\\register_fallback_auth', 15 );
+
+/**
+ * Tells the AI plugin (`wp-content/plugins/ai`) that Osaurus counts as having
+ * credentials even when no API key option is stored.
+ *
+ * The AI plugin's `has_ai_credentials()` returns true only when at least one
+ * registered connector has a non-empty value at its
+ * `authentication.setting_name` option (core auto-generates
+ * `connectors_ai_osaurus_api_key`). Osaurus runs locally and accepts any
+ * credential, so we never write to that option. Without this filter every
+ * downstream AI feature reports "no connector active" even when Osaurus is
+ * registered and reachable.
+ *
+ * The check stays scoped: we only flip the flag when `osaurus` is in the
+ * list of active connectors the AI plugin passed in. If the provider is
+ * unregistered or its plugin is deactivated, we leave the original value
+ * alone. The downstream `has_valid_ai_credentials()` still probes via the
+ * AI Client SDK, so unreachable Osaurus servers still fail the second check.
+ *
+ * @since 0.4.2
+ *
+ * @param bool                                $has_credentials Whether any connector has credentials.
+ * @param array<string, array<string, mixed>> $connectors      Active AI connectors keyed by ID.
+ * @return bool True when Osaurus is registered, otherwise the unchanged input.
+ */
+function declare_credentials_for_osaurus( bool $has_credentials, array $connectors ): bool {
+	if ( $has_credentials ) {
+		return true;
+	}
+
+	return isset( $connectors['osaurus'] );
+}
+add_filter( 'wpai_has_ai_credentials', __NAMESPACE__ . '\\declare_credentials_for_osaurus', 10, 2 );
 
 /**
  * Allows the WordPress HTTP API to reach the configured Osaurus host.
@@ -344,22 +380,6 @@ function register_rest_routes(): void {
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
 
 /**
- * REST callback: returns the model IDs advertised by the configured Osaurus
- * server, or a WP_Error on failure.
- *
- * Uses `wp_safe_remote_get()` (not `wp_remote_get()`) so the host / port
- * whitelisting done by `allow_localhost_requests()` and `allow_osaurus_port()`
- * applies. A short timeout keeps the admin screen responsive when Osaurus
- * is offline.
- *
- * @since 0.4.0
- *
- * @param \WP_REST_Request $request Incoming REST request; may carry a `base_url`
- *                                  query arg so the admin UI can probe an
- *                                  unsaved URL before persisting it.
- * @return \WP_REST_Response|\WP_Error
- */
-/**
  * Performs an admin-side GET against the configured (or overridden) Osaurus
  * server and returns the decoded JSON body.
  *
@@ -391,16 +411,21 @@ function probe_osaurus( string $base_url, string $url ) {
 	add_filter( 'http_request_host_is_external', $allow_host, 10, 2 );
 	add_filter( 'http_allowed_safe_ports', $allow_port );
 
-	$response = wp_safe_remote_get(
-		$url,
-		array(
-			'timeout' => 5,
-			'headers' => array( 'Accept' => 'application/json' ),
-		)
-	);
-
-	remove_filter( 'http_request_host_is_external', $allow_host, 10 );
-	remove_filter( 'http_allowed_safe_ports', $allow_port );
+	// try/finally guarantees the host / port whitelist is reverted even if the
+	// HTTP call throws or a downstream filter does. Without it a failure here
+	// would leak the broadened safe-request policy for the rest of the request.
+	try {
+		$response = wp_safe_remote_get(
+			$url,
+			array(
+				'timeout' => 5,
+				'headers' => array( 'Accept' => 'application/json' ),
+			)
+		);
+	} finally {
+		remove_filter( 'http_request_host_is_external', $allow_host, 10 );
+		remove_filter( 'http_allowed_safe_ports', $allow_port );
+	}
 
 	if ( is_wp_error( $response ) ) {
 		return new \WP_Error(
@@ -449,6 +474,22 @@ function resolve_probe_base_url( \WP_REST_Request $request ): string {
 		: get_base_url();
 }
 
+/**
+ * REST callback: returns the model IDs advertised by the configured Osaurus
+ * server, or a WP_Error on failure.
+ *
+ * Uses `wp_safe_remote_get()` (not `wp_remote_get()`) so the host / port
+ * whitelisting done by `allow_localhost_requests()` and `allow_osaurus_port()`
+ * applies. A short timeout keeps the admin screen responsive when Osaurus
+ * is offline.
+ *
+ * @since 0.4.0
+ *
+ * @param \WP_REST_Request $request Incoming REST request; may carry a `base_url`
+ *                                  query arg so the admin UI can probe an
+ *                                  unsaved URL before persisting it.
+ * @return \WP_REST_Response|\WP_Error
+ */
 function rest_get_models( \WP_REST_Request $request ) {
 	$base    = resolve_probe_base_url( $request );
 	$decoded = probe_osaurus( $base, trailingslashit( $base ) . 'models' );

@@ -10,6 +10,10 @@ declare(strict_types=1);
 
 namespace OsaurusAi\Connector\Metadata;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use WordPress\AiClient\Messages\Enums\ModalityEnum;
 use WordPress\AiClient\Providers\Http\DTO\Request;
 use WordPress\AiClient\Providers\Http\DTO\Response;
@@ -160,12 +164,16 @@ class OsaurusModelMetadataDirectory extends AbstractOpenAiCompatibleModelMetadat
 		$aId = $a->getId();
 		$bId = $b->getId();
 
-		// Demote known "experimental" model ID suffixes.
+		// Demote known "experimental" model ID suffixes. `strpos` is used
+		// rather than `str_contains` because the latter is PHP 8.0+ and the
+		// plugin still supports PHP 7.4 per the `Requires PHP` header.
 		foreach ( array( '-preview', '-draft', '-test' ) as $demote ) {
-			if ( str_contains( $aId, $demote ) && ! str_contains( $bId, $demote ) ) {
+			$aHas = false !== strpos( $aId, $demote );
+			$bHas = false !== strpos( $bId, $demote );
+			if ( $aHas && ! $bHas ) {
 				return 1;
 			}
-			if ( str_contains( $bId, $demote ) && ! str_contains( $aId, $demote ) ) {
+			if ( $bHas && ! $aHas ) {
 				return -1;
 			}
 		}
