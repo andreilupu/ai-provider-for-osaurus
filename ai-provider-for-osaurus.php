@@ -87,6 +87,46 @@ const DEFAULT_MODEL_OPTION = 'osaurus_ai_connector_default_model';
 require_once __DIR__ . '/src/autoload.php';
 
 /**
+ * Removes plugin options on uninstall, including across every site on a
+ * multisite network.
+ *
+ * Registered via `register_uninstall_hook()` rather than a separate
+ * `uninstall.php` file so the cleanup logic lives in the same namespace as
+ * the option name constants it references and avoids the global-scope
+ * variables a top-level uninstall script would introduce.
+ *
+ * The plugin's main file is included by WordPress before this callback
+ * fires, so the autoloader and constants are already available.
+ *
+ * @since 0.4.2
+ *
+ * @return void
+ */
+function uninstall_cleanup(): void {
+	delete_option( BASE_URL_OPTION );
+	delete_option( DEFAULT_MODEL_OPTION );
+
+	// `number => 0` disables `get_sites()`'s default 100-site cap so large
+	// multisite networks are cleaned in full instead of leaking options on
+	// the 101st site and beyond.
+	if ( is_multisite() ) {
+		$sites = get_sites(
+			array(
+				'fields' => 'ids',
+				'number' => 0,
+			)
+		);
+		foreach ( $sites as $site ) {
+			switch_to_blog( (int) $site );
+			delete_option( BASE_URL_OPTION );
+			delete_option( DEFAULT_MODEL_OPTION );
+			restore_current_blog();
+		}
+	}
+}
+register_uninstall_hook( PLUGIN_FILE, __NAMESPACE__ . '\\uninstall_cleanup' );
+
+/**
  * Resolves the Osaurus base URL to use for all API requests.
  *
  * Resolution order (first match wins):
