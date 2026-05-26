@@ -1,4 +1,4 @@
-# Osaurus AI Connector
+# AI Provider for Osaurus
 
 A WordPress plugin that registers [Osaurus](https://osaurus.ai) — a local, Apple-Silicon-native LLM runtime — as a provider for the [WordPress AI Client](https://make.wordpress.org/core/2026/03/24/introducing-the-ai-client-in-wordpress-7-0/) shipping with WordPress 7.0.
 
@@ -27,10 +27,10 @@ Once activated, any plugin that uses `wp_ai_client_prompt()` (Gutenberg AI featu
 
 ```bash
 cd wp-content/plugins
-git clone https://github.com/andreilupu/osaurus-ai-connector.git
+git clone https://github.com/andreilupu/ai-provider-for-osaurus.git
 ```
 
-Then activate **Osaurus AI Connector** on the Plugins screen.
+Then activate **AI Provider for Osaurus** on the Plugins screen.
 
 ### Option B — `@wordpress/env` (for development)
 
@@ -48,11 +48,11 @@ Then open <http://localhost:8888/wp-admin> (credentials: `admin` / `password`).
 Osaurus defaults to `http://127.0.0.1:1337/v1` on the host machine. The plugin resolves the base URL in this order (first match wins):
 
 1. **`OSAURUS_BASE_URL` PHP constant** — define this in `wp-config.php` or in the `.wp-env.json` config block.
-2. **`osaurus_ai_connector_base_url` option** — settable from the admin screen (planned) or via `update_option()`.
-3. **Default: `http://host.docker.internal:1337/v1`** — picks up an Osaurus server running on the Docker host.
+2. **`osaurus_ai_connector_base_url` option** — settable from **Settings → Connectors** or via `update_option()`.
+3. **Default: `http://127.0.0.1:1337/v1`** — works out of the box for bare-metal WordPress on the same Mac as Osaurus.
 
-> **Tip for bare-metal installs:** set `OSAURUS_BASE_URL` to `http://127.0.0.1:1337/v1`.
-> **Tip for wp-env / Docker:** the default already works, no setup required.
+> **Tip for bare-metal installs:** the default already works, no setup required.
+> **Tip for wp-env / Docker:** set `OSAURUS_BASE_URL` to `http://host.docker.internal:1337/v1` or pick the Docker preset in the admin UI. The bundled `.wp-env.json` already sets the constant.
 
 The plugin also whitelists the configured host in `http_request_host_is_external` and appends the configured port to `http_allowed_safe_ports`, so WordPress's safe HTTP API can actually reach a local service on a non-standard port.
 
@@ -96,7 +96,7 @@ If you need image generation, pair this plugin with an image-capable provider su
 
 ```
 .
-├── osaurus-ai-connector.php     # Plugin bootstrap, hooks, HTTP filters
+├── ai-provider-for-osaurus.php  # Plugin bootstrap, hooks, HTTP filters
 ├── src/
 │   ├── autoload.php             # PSR-4 autoloader for OsaurusAi\Connector\
 │   ├── Provider/

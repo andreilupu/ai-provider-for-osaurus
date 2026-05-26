@@ -1,6 +1,6 @@
 <?php
 /**
- * PSR-4 autoloader for the Osaurus AI Connector plugin.
+ * PSR-4 autoloader for the AI Provider for Osaurus plugin.
  *
  * Classes under the `OsaurusAi\Connector\` namespace map 1:1 to files under
  * `src/` using forward slashes in place of namespace separators. Composer is

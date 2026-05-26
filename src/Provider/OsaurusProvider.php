@@ -10,6 +10,10 @@ declare(strict_types=1);
 
 namespace OsaurusAi\Connector\Provider;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use WordPress\AiClient\AiClient;
 use WordPress\AiClient\Common\Exception\RuntimeException;
 use WordPress\AiClient\Providers\ApiBasedImplementation\AbstractApiProvider;
@@ -25,6 +29,7 @@ use OsaurusAi\Connector\Metadata\OsaurusModelMetadataDirectory;
 use OsaurusAi\Connector\Models\OsaurusTextGenerationModel;
 
 use function OsaurusAi\Connector\get_base_url;
+use const OsaurusAi\Connector\PLUGIN_FILE;
 
 /**
  * Provider class for Osaurus.
@@ -86,9 +91,10 @@ class OsaurusProvider extends AbstractApiProvider {
 			}
 		}
 
-		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception message is not rendered to users.
 		throw new RuntimeException(
-			'Unsupported Osaurus model capabilities: ' . implode( ', ', $modelMetadata->getSupportedCapabilities() )
+			esc_html(
+				'Unsupported Osaurus model capabilities: ' . implode( ', ', $modelMetadata->getSupportedCapabilities() )
+			)
 		);
 	}
 
@@ -123,14 +129,27 @@ class OsaurusProvider extends AbstractApiProvider {
 		if ( version_compare( AiClient::VERSION, '1.2.0', '>=' ) ) {
 			// The WP 7.0 Connectors UI currently only renders rows for api_key
 			// providers, so we advertise api_key auth even though Osaurus does
-			// not require a key. The description calls this out so users do
-			// not waste time looking up a credential that doesn't exist.
-			$description = 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. No API key required — leave the field blank.';
+			// not require a key. The description doubles as onboarding copy:
+			// it points users at the Osaurus install (an external Mac app, not
+			// an account they need to sign up for) and clarifies that there
+			// is no credential to look up.
+			$args[] = __(
+				'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. Requires the Osaurus app to be installed and running on this Mac — download it from https://osaurus.ai. No API key needed.',
+				'ai-provider-for-osaurus'
+			);
+		}
 
-			// Localisable on WordPress; raw string when the SDK is used outside WP (e.g. in tests / CLI).
-			$args[] = function_exists( '__' )
-				? __( 'Local Apple Silicon LLM runtime with OpenAI-compatible endpoints. No API key required — leave the field blank.', 'osaurus-ai-connector' )
-				: $description;
+		// Provider logo, supported by SDK ≥ 1.3.0 (Connectors UI renders it next
+		// to the provider name). Skipped on older SDK builds — the optional
+		// constructor arg simply does not exist there.
+		//
+		// Core's `_wp_connectors_resolve_ai_provider_logo_url()` checks that the
+		// path starts with `WP_PLUGIN_DIR`. `plugin_dir_path( __FILE__ )` can
+		// return a symlink-resolved path that does not (e.g. under wp-env bind
+		// mounts), so we build the path through `plugin_basename()` instead,
+		// which is symlink-aware and guarantees a `WP_PLUGIN_DIR`-relative root.
+		if ( version_compare( AiClient::VERSION, '1.3.0', '>=' ) ) {
+			$args[] = trailingslashit( WP_PLUGIN_DIR ) . dirname( plugin_basename( PLUGIN_FILE ) ) . '/assets/img/osaurus.svg';
 		}
 
 		return new ProviderMetadata( ...$args );

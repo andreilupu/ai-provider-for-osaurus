@@ -11,8 +11,5 @@
 		"SCRIPT_DEBUG": true,
 		"WP_ENVIRONMENT_TYPE": "local",
 		"OSAURUS_BASE_URL": "http://host.docker.internal:1337/v1"
-	},
-	"mappings": {
-		"wp-content/mu-plugins/osaurus-dev.php": "./tools/mu-osaurus-dev.php"
 	}
 }
