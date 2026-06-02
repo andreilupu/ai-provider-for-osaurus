@@ -139,8 +139,9 @@ Confirm Osaurus is running and reachable from the host running WordPress. If you
 
 == Screenshots ==
 
-1. Osaurus row on the Connectors admin screen with a custom URL field.
-2. Model picker populated from the Osaurus `/v1/models` endpoint.
+1. The Osaurus connector on the Connectors admin screen: server URL field, live reachability status with round-trip latency, bare-metal / Docker presets, and a default-model picker populated from the Osaurus server.
+2. Using AI in the block editor — the paragraph toolbar offers Shorten, Expand, and Rephrase, all routed to the local Osaurus server.
+3. An AI-generated suggested replacement shown in the editor, produced locally by Osaurus.
 
 == Changelog ==
 
