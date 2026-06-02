@@ -8,6 +8,8 @@ node_modules
 vendor
 tools
 Readme.md
+AGENTS.md
+CLAUDE.md
 .github
 .wordpress-org
 assets-src
