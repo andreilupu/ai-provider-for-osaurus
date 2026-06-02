@@ -3,8 +3,6 @@
 .gitignore
 .gitattributes
 .distignore
-.wp-env.json
-.wp-env.override.json
 .claude
 node_modules
 vendor

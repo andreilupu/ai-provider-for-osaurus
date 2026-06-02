@@ -53,12 +53,10 @@ const PLUGIN_VERSION = '0.4.2';
  * Default Osaurus base URL, used when no constant or option is provided.
  *
  * Targets loopback so the plugin works out of the box on bare-metal WordPress
- * installs (Studio, MAMP, Valet, Local, native PHP). Docker setups
- * (`@wordpress/env`, DDEV, Lando) cannot reach the host on `127.0.0.1` and
- * must override via the `OSAURUS_BASE_URL` constant or by selecting the
- * Docker preset in **Settings → Connectors**
- * (`http://host.docker.internal:1337/v1`). The bundled `.wp-env.json` already
- * sets the constant for the dev environment.
+ * installs (Studio, MAMP, Valet, Local, native PHP). Docker-based setups
+ * (DDEV, Lando, Docker Desktop) cannot reach the host on `127.0.0.1` and must
+ * override via the `OSAURUS_BASE_URL` constant or by selecting the Docker
+ * preset in **Settings → Connectors** (`http://host.docker.internal:1337/v1`).
  *
  * @since 0.1.0
  * @var string
@@ -90,7 +88,7 @@ require_once __DIR__ . '/src/autoload.php';
  * Resolves the Osaurus base URL to use for all API requests.
  *
  * Resolution order (first match wins):
- *   1. `OSAURUS_BASE_URL` PHP constant — for wp-env / CI / server configs.
+ *   1. `OSAURUS_BASE_URL` PHP constant — for CI / server / container configs.
  *   2. `osaurus_ai_connector_base_url` option — for the future settings screen.
  *   3. {@see DEFAULT_BASE_URL} — Docker-aware default.
  *

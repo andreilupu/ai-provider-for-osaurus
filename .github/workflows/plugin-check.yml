@@ -2,16 +2,6 @@ name: Plugin Check
 
 # Runs the official WordPress Plugin Check (the same tool the plugin review
 # team uses) on every pull request and on pushes to main.
-#
-# NOTE: we deliberately do NOT use wordpress/plugin-check-action@v1 here.
-# That action auto-generates a .wp-env.json that installs Plugin Check as a
-# URL-download plugin, which trips a wp-env (`got` + libuv 1.52.1) bug on the
-# newer ubuntu-24.04 runner image: `wp-env start` silently exits 0 without
-# bringing Docker up, and the check then fails with "Environment not
-# initialized". See WordPress/plugin-check-action#579.
-#
-# Instead we inline the steps, boot wp-env with NO url-source plugins, verify
-# the environment actually started, then install Plugin Check via wp-cli.
 
 on:
   push:
@@ -33,41 +23,9 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Write a clean wp-env config (no URL-source plugins)
-        # Mounts the checkout as the plugin under test. No `plugins` URL
-        # entries, so wp-env never exercises the buggy download path.
-        # `core: null` = latest WordPress (7.0+, which ships the AI Client).
-        run: |
-          cat > .wp-env.json <<'JSON'
-          {
-            "core": null,
-            "plugins": [ "." ],
-            "testsEnvironment": false
-          }
-          JSON
-
-      - name: Install @wordpress/env
-        run: npm -g --no-fund install @wordpress/env
-
-      - name: Start wp-env
-        run: wp-env start
-
-      - name: Verify the environment actually came up
-        # wp-env can exit 0 without starting Docker; this turns that silent
-        # failure into a loud one.
-        run: wp-env run cli wp core version
-
-      - name: Install and activate Plugin Check
-        run: wp-env run cli wp plugin install plugin-check --activate
-
       - name: Run Plugin Check
-        run: |
-          wp-env run cli wp plugin check ai-provider-for-osaurus \
-            --format=table \
-            --exclude-directories=.wordpress-org,assets-src,.github \
-            --exclude-files=.wp-env.json
+        uses: wordpress/plugin-check-action@v1
+        with:
+          exclude-directories: |
+            .wordpress-org
+            assets-src

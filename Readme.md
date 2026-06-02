@@ -23,36 +23,27 @@ Once activated, any plugin that uses `wp_ai_client_prompt()` (Gutenberg AI featu
 
 ## Installation
 
-### Option A — Clone into a WordPress install
+Install from the [WordPress.org plugin directory](https://wordpress.org/plugins/ai-provider-for-osaurus/), or clone into any WordPress 7.0+ install:
 
 ```bash
 cd wp-content/plugins
 git clone https://github.com/andreilupu/ai-provider-for-osaurus.git
 ```
 
-Then activate **AI Provider for Osaurus** on the Plugins screen.
-
-### Option B — `@wordpress/env` (for development)
-
-The repository ships with a `.wp-env.json` that boots a WordPress 7.0 RC image with the plugin auto-mounted. From the plugin directory:
-
-```bash
-npm install -g @wordpress/env   # one-time
-wp-env start
-```
-
-Then open <http://localhost:8888/wp-admin> (credentials: `admin` / `password`).
+Then activate **AI Provider for Osaurus** on the Plugins screen. Any local
+WordPress (WP Studio, Local, MAMP, Valet, native PHP) works — the plugin needs
+no build step.
 
 ## Configuration
 
 Osaurus defaults to `http://127.0.0.1:1337/v1` on the host machine. The plugin resolves the base URL in this order (first match wins):
 
-1. **`OSAURUS_BASE_URL` PHP constant** — define this in `wp-config.php` or in the `.wp-env.json` config block.
+1. **`OSAURUS_BASE_URL` PHP constant** — define this in `wp-config.php`.
 2. **`osaurus_ai_connector_base_url` option** — settable from **Settings → Connectors** or via `update_option()`.
 3. **Default: `http://127.0.0.1:1337/v1`** — works out of the box for bare-metal WordPress on the same Mac as Osaurus.
 
 > **Tip for bare-metal installs:** the default already works, no setup required.
-> **Tip for wp-env / Docker:** set `OSAURUS_BASE_URL` to `http://host.docker.internal:1337/v1` or pick the Docker preset in the admin UI. The bundled `.wp-env.json` already sets the constant.
+> **Tip for Docker-based WordPress (DDEV, Lando, Docker Desktop):** set `OSAURUS_BASE_URL` to `http://host.docker.internal:1337/v1` or pick the Docker preset in the admin UI, so the container can reach Osaurus on the host.
 
 The plugin also whitelists the configured host in `http_request_host_is_external` and appends the configured port to `http_allowed_safe_ports`, so WordPress's safe HTTP API can actually reach a local service on a non-standard port.
 
@@ -97,6 +88,7 @@ If you need image generation, pair this plugin with an image-capable provider su
 ```
 .
 ├── ai-provider-for-osaurus.php  # Plugin bootstrap, hooks, HTTP filters
+├── uninstall.php                # Option cleanup on uninstall
 ├── src/
 │   ├── autoload.php             # PSR-4 autoloader for OsaurusAi\Connector\
 │   ├── Provider/
@@ -105,35 +97,28 @@ If you need image generation, pair this plugin with an image-capable provider su
 │   │   └── OsaurusTextGenerationModel.php
 │   └── Metadata/
 │       └── OsaurusModelMetadataDirectory.php
-├── tools/
-│   └── mu-osaurus-dev.php       # Dev-only mu-plugin loaded by wp-env
-├── .wp-env.json                 # @wordpress/env configuration
+├── assets/                      # Shipped JS module + provider logo
 └── Readme.md
 ```
 
 ## Development
 
-### Running the dev environment
-
-```bash
-wp-env start
-wp-env stop
-wp-env clean all      # nuke the Docker volumes and start over
-```
+Develop against any local WordPress 7.0+ install (WP Studio, Local, MAMP,
+Valet, native PHP). Symlink or clone this repo into `wp-content/plugins/` and
+activate it.
 
 ### PHP lint
 
 ```bash
-find . -name '*.php' -not -path './examples/*' -not -path './ai-provider-for-llamacpp/*' \
-  | xargs -n1 php -l
+find . -name '*.php' | xargs -n1 php -l
 ```
 
 ### Quick smoke test
 
-With wp-env running and Osaurus listening on the host:
+With Osaurus running and the plugin active, run via WP-CLI against your site:
 
 ```bash
-wp-env run cli wp eval '
+wp eval '
     $result = wp_ai_client_prompt("Say hello in three words.")->generate_text();
     echo $result;
 '

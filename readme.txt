@@ -50,9 +50,9 @@ The plugin resolves the Osaurus base URL in this order (first match wins):
 WordPress can run in many places &mdash; the right base URL depends on how it reaches your Mac, where Osaurus is listening.
 
 * **Bare-metal WordPress on the same Mac** (MAMP, Laravel Valet, Local, WordPress Studio, native PHP):
-  `http://127.0.0.1:1337/v1`
-* **Docker-based WordPress on the same Mac** (`@wordpress/env`, DDEV, Lando, Docker Desktop):
-  `http://host.docker.internal:1337/v1` *(this is the default &mdash; no configuration needed)*
+  `http://127.0.0.1:1337/v1` *(this is the default &mdash; no configuration needed)*
+* **Docker-based WordPress on the same Mac** (DDEV, Lando, Docker Desktop):
+  `http://host.docker.internal:1337/v1`
 * **WordPress on a different machine on your LAN, Osaurus on your Mac:**
   `http://<your-mac-LAN-IP>:1337/v1` &mdash; make sure Osaurus is bound to a non-loopback interface and your firewall allows port 1337.
 * **Remote Osaurus you operate** (e.g. a Mac mini on Tailscale, a colocated server):
@@ -87,7 +87,7 @@ The plugin sends HTTP requests only to the host and port resolved (in order) fro
 Two host targets are referenced by name in the plugin code as quick-pick presets and as the default:
 
 * `127.0.0.1:1337` &mdash; loopback on the same machine as WordPress (default). Used by bare-metal installs (Studio, MAMP, Valet, Local, native PHP).
-* `host.docker.internal:1337` &mdash; Docker's hostname for the host machine. Used by Docker-based WordPress (`@wordpress/env`, DDEV, Lando, Docker Desktop). Resolved by Docker, not by a public DNS server.
+* `host.docker.internal:1337` &mdash; Docker's hostname for the host machine. Used by Docker-based WordPress (DDEV, Lando, Docker Desktop). Resolved by Docker, not by a public DNS server.
 
 If the user configures a different URL, the plugin only contacts that URL. The plugin never contacts any third-party endpoint operated by the plugin author, the Osaurus project, or any other party.
 
@@ -109,7 +109,7 @@ Osaurus is open-source software you self-host. There is no third-party service o
 4. Activate **AI Provider for Osaurus** on the **Plugins** screen.
 5. Visit **Settings &rarr; Connectors**. The Osaurus row should report as connected once a model list is available.
 
-If WordPress and Osaurus run on the same host, no further configuration is required &mdash; the default `http://127.0.0.1:1337/v1` works as-is. If you run WordPress inside Docker (e.g. `@wordpress/env`), switch the URL to `http://host.docker.internal:1337/v1` from **Settings &rarr; Connectors** or set `OSAURUS_BASE_URL` in your environment config.
+If WordPress and Osaurus run on the same host, no further configuration is required &mdash; the default `http://127.0.0.1:1337/v1` works as-is. If you run WordPress inside Docker (DDEV, Lando, Docker Desktop), switch the URL to `http://host.docker.internal:1337/v1` from **Settings &rarr; Connectors** or set `OSAURUS_BASE_URL` in your environment config.
 
 == Frequently Asked Questions ==
 
