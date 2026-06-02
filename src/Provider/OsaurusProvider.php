@@ -145,8 +145,9 @@ class OsaurusProvider extends AbstractApiProvider {
 		//
 		// Core's `_wp_connectors_resolve_ai_provider_logo_url()` checks that the
 		// path starts with `WP_PLUGIN_DIR`. `plugin_dir_path( __FILE__ )` can
-		// return a symlink-resolved path that does not (e.g. under wp-env bind
-		// mounts), so we build the path through `plugin_basename()` instead,
+		// return a symlink-resolved path that does not (e.g. when the plugin
+		// folder is symlinked into wp-content/plugins, as WP Studio and similar
+		// tools do), so we build the path through `plugin_basename()` instead,
 		// which is symlink-aware and guarantees a `WP_PLUGIN_DIR`-relative root.
 		if ( version_compare( AiClient::VERSION, '1.3.0', '>=' ) ) {
 			$args[] = trailingslashit( WP_PLUGIN_DIR ) . dirname( plugin_basename( PLUGIN_FILE ) ) . '/assets/img/osaurus.svg';

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#F472B6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Window chrome -->
+  <rect width="1280" height="800" fill="#F0F0F1"/>
+  <rect width="1280" height="48" fill="#1D2327"/>
+  <circle cx="22" cy="24" r="6" fill="#FF5F57"/>
+  <circle cx="44" cy="24" r="6" fill="#FEBC2E"/>
+  <circle cx="66" cy="24" r="6" fill="#28C840"/>
+  <text x="640" y="30" text-anchor="middle" font-size="14" fill="#A7AAAD">Editor — WordPress</text>
+
+  <!-- Sidebar nav -->
+  <rect x="0" y="48" width="60" height="752" fill="#1D2327"/>
+  <rect x="0" y="80" width="60" height="44" fill="#2C3338"/>
+  <circle cx="30" cy="102" r="9" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+
+  <!-- Editor canvas -->
+  <rect x="60" y="48" width="900" height="752" fill="#FFFFFF"/>
+  <text x="510" y="160" text-anchor="middle" font-size="26" font-weight="700" fill="#1D2327">Draft a release note for v2.4</text>
+  <line x1="120" y1="200" x2="900" y2="200" stroke="#F0F0F1"/>
+
+  <!-- AI block -->
+  <g transform="translate(120, 240)">
+    <rect width="780" height="380" rx="8" fill="#FAFAFB" stroke="#DCDCDE"/>
+    <g transform="translate(20, 20)">
+      <rect width="160" height="28" rx="14" fill="#F8FAFC" stroke="#CBD5E1"/>
+      <circle cx="18" cy="14" r="6" fill="url(#accent)"/>
+      <text x="32" y="19" font-size="12" font-weight="600" fill="#0F172A">AI assistant</text>
+    </g>
+
+    <!-- Bubble -->
+    <g transform="translate(20, 70)">
+      <rect width="740" height="120" rx="10" fill="#FFFFFF" stroke="#E5E7EB"/>
+      <text x="16" y="34" font-size="14" fill="#1D2327">Streaming a draft from Osaurus on your Mac…</text>
+      <rect x="16" y="58" width="700" height="6" rx="3" fill="#E5E7EB"/>
+      <rect x="16" y="58" width="430" height="6" rx="3" fill="url(#accent)"/>
+      <text x="16" y="90" font-size="12" fill="#646970">37 tokens · 0.4s to first token · localhost:1337</text>
+    </g>
+
+    <!-- Model picker dropdown -->
+    <g transform="translate(20, 210)">
+      <text x="0" y="0" font-size="12" font-weight="600" fill="#1D2327">Model</text>
+      <rect x="0" y="10" width="320" height="40" rx="4" fill="#FFFFFF" stroke="#2271B1" stroke-width="2"/>
+      <text x="16" y="36" font-size="14" fill="#1D2327">llama-3.1-8b-instruct</text>
+      <path d="M 290 28 L 300 38 L 310 28" fill="none" stroke="#1D2327" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- Dropdown panel -->
+      <rect x="0" y="58" width="320" height="170" rx="6" fill="#FFFFFF" stroke="#DCDCDE"/>
+      <rect x="0" y="58" width="320" height="32" fill="#F0F6FC"/>
+      <text x="16" y="79" font-size="13" fill="#0F172A" font-weight="600">llama-3.1-8b-instruct</text>
+      <text x="16" y="110" font-size="13" fill="#1D2327">qwen2.5-7b</text>
+      <text x="16" y="138" font-size="13" fill="#1D2327">mistral-7b-instruct</text>
+      <text x="16" y="166" font-size="13" fill="#1D2327">phi-3.5-mini</text>
+      <text x="16" y="194" font-size="13" fill="#1D2327">codellama-7b</text>
+      <text x="16" y="222" font-size="11" fill="#646970">Models loaded from /v1/models</text>
+    </g>
+  </g>
+
+  <!-- Inspector -->
+  <rect x="960" y="48" width="320" height="752" fill="#FFFFFF" stroke="#DCDCDE"/>
+  <text x="980" y="80" font-size="14" font-weight="700" fill="#1D2327">AI</text>
+  <line x1="980" y1="92" x2="1260" y2="92" stroke="#F0F0F1"/>
+
+  <text x="980" y="124" font-size="12" font-weight="600" fill="#1D2327">Provider</text>
+  <rect x="980" y="132" width="280" height="36" rx="4" fill="#F6F7F7" stroke="#DCDCDE"/>
+  <circle cx="998" cy="150" r="8" fill="#0F172A"/>
+  <circle cx="998" cy="150" r="5" fill="none" stroke="url(#accent)" stroke-width="1.6"/>
+  <text x="1012" y="155" font-size="13" font-weight="600" fill="#1D2327">Osaurus</text>
+
+  <text x="980" y="200" font-size="12" font-weight="600" fill="#1D2327">Temperature</text>
+  <rect x="980" y="210" width="280" height="6" rx="3" fill="#E5E7EB"/>
+  <rect x="980" y="210" width="100" height="6" rx="3" fill="#2271B1"/>
+  <circle cx="1080" cy="213" r="9" fill="#FFFFFF" stroke="#2271B1" stroke-width="2"/>
+  <text x="1252" y="216" text-anchor="end" font-size="11" fill="#646970">0.7</text>
+
+  <text x="980" y="252" font-size="12" font-weight="600" fill="#1D2327">Max tokens</text>
+  <rect x="980" y="262" width="280" height="36" rx="4" fill="#FFFFFF" stroke="#8C8F94"/>
+  <text x="996" y="286" font-size="13" fill="#1D2327">1024</text>
+
+  <text x="980" y="330" font-size="12" font-weight="600" fill="#1D2327">Stream output</text>
+  <rect x="980" y="340" width="36" height="20" rx="10" fill="#2271B1"/>
+  <circle cx="1004" cy="350" r="8" fill="#FFFFFF"/>
+</svg>

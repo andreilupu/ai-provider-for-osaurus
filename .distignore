@@ -3,14 +3,15 @@
 .gitignore
 .gitattributes
 .distignore
-.wp-env.json
-.wp-env.override.json
 .claude
 node_modules
 vendor
 tools
 Readme.md
 .github
+.wordpress-org
+assets-src
+blog-article.md
 .editorconfig
 phpcs.xml
 phpcs.xml.dist

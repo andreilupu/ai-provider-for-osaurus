@@ -374,9 +374,9 @@ function OsaurusSettings() {
 	 * Quick-pick presets covering the two most common setups.
 	 *
 	 * Users running WordPress bare-metal on the same Mac as Osaurus need
-	 * `127.0.0.1`; users running WordPress inside Docker (wp-env, DDEV,
-	 * Lando) need `host.docker.internal` so the container can reach the
-	 * host. Other setups (LAN, remote) require a custom URL — surfacing
+	 * `127.0.0.1`; users running WordPress inside Docker (DDEV, Lando,
+	 * Docker Desktop) need `host.docker.internal` so the container can reach
+	 * the host. Other setups (LAN, remote) require a custom URL — surfacing
 	 * the two common ones cuts setup friction without crowding the UI.
 	 */
 	const presets = [
@@ -391,7 +391,7 @@ function OsaurusSettings() {
 		{
 			label: __( 'Docker (host.docker.internal)', 'ai-provider-for-osaurus' ),
 			description: __(
-				'WordPress in Docker on the same Mac (wp-env, DDEV, Lando, Docker Desktop).',
+				'WordPress in Docker on the same Mac (DDEV, Lando, Docker Desktop).',
 				'ai-provider-for-osaurus'
 			),
 			url: 'http://host.docker.internal:1337/v1',

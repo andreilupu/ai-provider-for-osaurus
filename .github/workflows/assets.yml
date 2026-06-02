@@ -1,0 +1,37 @@
+name: Update WordPress.org assets
+
+# Pushes the plugin directory listing assets (banner, icon, screenshots) to
+# WordPress.org without cutting a new release. Runs whenever files under
+# `.wordpress-org/` change on the main branch, so you can refresh artwork or
+# screenshots independently of a code release.
+#
+# Requires the same secrets as the deploy workflow:
+#   - SVN_USERNAME
+#   - SVN_PASSWORD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.wordpress-org/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  assets:
+    name: Sync assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Update plugin assets on WordPress.org
+        uses: 10up/action-wordpress-plugin-asset-update@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: ai-provider-for-osaurus
+          ASSETS_DIR: .wordpress-org

@@ -1,0 +1,54 @@
+name: Deploy to WordPress.org
+
+# Publishes a release to the WordPress.org plugin directory whenever a version
+# tag is pushed. The tag name must match the plugin's Stable tag / Version
+# header exactly (e.g. `0.4.2` — no `v` prefix).
+#
+# What it does on each tag:
+#   - copies the repo (minus everything in .distignore) into SVN `trunk/`
+#   - creates the matching SVN `tags/<version>/`
+#   - syncs `.wordpress-org/` into SVN `assets/` (banner, icon, screenshots)
+#
+# Requires two repository secrets (Settings → Secrets and variables → Actions):
+#   - SVN_USERNAME : your WordPress.org account username
+#   - SVN_PASSWORD : your WordPress.org account password
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Guard — tag must match the plugin version header
+        run: |
+          HEADER_VERSION="$(grep -oP '(?<=\* Version:\s{1,50}).+' ai-provider-for-osaurus.php | tr -d '[:space:]')"
+          STABLE_TAG="$(grep -oP '(?<=Stable tag:\s{1,50}).+' readme.txt | tr -d '[:space:]')"
+          echo "Tag pushed   : ${GITHUB_REF_NAME}"
+          echo "Header Version: ${HEADER_VERSION}"
+          echo "Stable tag    : ${STABLE_TAG}"
+          if [ "${GITHUB_REF_NAME}" != "${HEADER_VERSION}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match the plugin Version header ${HEADER_VERSION}."
+            exit 1
+          fi
+          if [ "${GITHUB_REF_NAME}" != "${STABLE_TAG}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match readme.txt Stable tag ${STABLE_TAG}."
+            exit 1
+          fi
+
+      - name: Deploy to WordPress.org SVN
+        uses: 10up/action-wordpress-plugin-deploy@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: ai-provider-for-osaurus
+          ASSETS_DIR: .wordpress-org
