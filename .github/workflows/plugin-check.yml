@@ -1,0 +1,35 @@
+name: Plugin Check
+
+# Runs the official WordPress Plugin Check (the same tool the plugin review
+# team uses) on every pull request and on pushes to main. Catches readme,
+# i18n, escaping, and coding-standard regressions before they ship.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plugin-check:
+    name: Run Plugin Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run Plugin Check
+        uses: wordpress/plugin-check-action@v1
+        with:
+          # The repository root is the plugin root.
+          build-dir: './'
+          # Surface errors and warnings; fail the job only on errors.
+          exclude-directories: |
+            .wordpress-org
+            assets-src

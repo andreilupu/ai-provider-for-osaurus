@@ -11,6 +11,9 @@ vendor
 tools
 Readme.md
 .github
+.wordpress-org
+assets-src
+blog-article.md
 .editorconfig
 phpcs.xml
 phpcs.xml.dist

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#F472B6"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" ry="56" fill="url(#bg)"/>
+  <!-- Outer ring representing the O -->
+  <circle cx="128" cy="128" r="74" fill="none" stroke="url(#accent)" stroke-width="14"/>
+  <!-- Prompt cursor inside: > -->
+  <path d="M 104 102 L 130 128 L 104 154" fill="none" stroke="#F8FAFC" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Underscore caret -->
+  <rect x="138" y="146" width="22" height="10" rx="3" fill="#F8FAFC"/>
+</svg>
