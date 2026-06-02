@@ -1,7 +1,10 @@
 name: Plugin Check
 
 # Runs the official WordPress Plugin Check (the same tool the plugin review
-# team uses) on every pull request and on pushes to main.
+# team uses). The check runs against a clean mirror of the plugin staged per
+# .distignore — i.e. exactly what WordPress.org receives at deploy time — so
+# repo-only files (.github, .gitignore, Readme.md, etc.) don't trip the
+# "hidden files" / "unexpected files" checks with false positives.
 
 on:
   push:
@@ -12,20 +15,45 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
+# Default-deny all permissions; the job grants only what it needs.
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   plugin-check:
     name: Run Plugin Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # The action posts a sticky review summary as a PR comment.
+      pull-requests: write
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
+      - name: Check out the repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Stage production artifact
+        # Plugin Check mounts whatever build-dir points at as the production
+        # plugin (slug = directory basename). Staging a .distignore-filtered
+        # mirror keeps repo-only files out of scope so the check matches the
+        # shipped plugin. The plugin has no build step — it ships as-is.
+        run: |
+          rm -rf .dist
+          mkdir -p .dist/ai-provider-for-osaurus
+          # rsync's --exclude-from treats '#'-lines as patterns, so strip
+          # comment and blank lines from .distignore first.
+          grep -vE '^[[:space:]]*(#|$)' .distignore > "$RUNNER_TEMP/dist-excludes"
+          rsync -a \
+            --exclude-from="$RUNNER_TEMP/dist-excludes" \
+            --exclude='/.dist/' \
+            --exclude='/.git/' \
+            ./ .dist/ai-provider-for-osaurus/
 
       - name: Run Plugin Check
-        uses: wordpress/plugin-check-action@v1
+        uses: WordPress/plugin-check-action@6f5a57e173c065a394b78688f75df543e4011902 # v1.1.5
         with:
-          exclude-directories: |
-            .wordpress-org
-            assets-src
+          build-dir: .dist/ai-provider-for-osaurus
