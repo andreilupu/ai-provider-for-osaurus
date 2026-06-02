@@ -31,8 +31,8 @@ jobs:
 
       - name: Guard — tag must match the plugin version header
         run: |
-          HEADER_VERSION="$(grep -oP '(?<=\* Version:\s{1,50}).+' ai-provider-for-osaurus.php | tr -d '[:space:]')"
-          STABLE_TAG="$(grep -oP '(?<=Stable tag:\s{1,50}).+' readme.txt | tr -d '[:space:]')"
+          HEADER_VERSION="$(sed -n 's/^[[:space:]]*\*[[:space:]]*Version:[[:space:]]*\([^[:space:]]*\).*/\1/p' ai-provider-for-osaurus.php | head -1)"
+          STABLE_TAG="$(sed -n 's/^Stable tag:[[:space:]]*\([^[:space:]]*\).*/\1/p' readme.txt | head -1)"
           echo "Tag pushed   : ${GITHUB_REF_NAME}"
           echo "Header Version: ${HEADER_VERSION}"
           echo "Stable tag    : ${STABLE_TAG}"
