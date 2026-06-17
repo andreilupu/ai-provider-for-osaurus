@@ -256,17 +256,47 @@ function register_connector_fields(): void {
 		)
 	);
 
-	// text — a free-form model ID.
-	register_connector_field(
-		'osaurus',
-		'default_model',
-		array(
-			'control'      => 'text',
-			'label'        => __( 'Default model', 'ai-provider-for-osaurus' ),
-			'description'  => __( 'Model ID to use when callers do not specify one. Leave blank to let Osaurus choose.', 'ai-provider-for-osaurus' ),
-			'setting_name' => DEFAULT_MODEL_OPTION,
-		)
-	);
+	// select with live choices — the model IDs the server actually advertises.
+	//
+	// `select` requires a non-empty `choices` map at registration time, but the
+	// list is dynamic, so we fetch it from the server's `/v1/models` endpoint
+	// (cached; see osaurus_model_choices()). When the server is unreachable we
+	// fall back to a free-form text input so the field still works offline.
+	//
+	// The live fetch is gated to admin requests: the choices only matter for
+	// rendering the Connectors screen, while the field's stored value resolves
+	// the same in every context regardless of control type. This keeps blocking
+	// HTTP off front-end page loads.
+	$model_choices = is_admin() ? osaurus_model_choices() : array();
+
+	if ( $model_choices ) {
+		register_connector_field(
+			'osaurus',
+			'default_model',
+			array(
+				'control'      => 'select',
+				'label'        => __( 'Default model', 'ai-provider-for-osaurus' ),
+				'description'  => __( 'Model to use when callers do not specify one.', 'ai-provider-for-osaurus' ),
+				'default'      => 'auto',
+				'choices'      => array_merge(
+					array( 'auto' => __( 'Auto (let Osaurus choose)', 'ai-provider-for-osaurus' ) ),
+					$model_choices
+				),
+				'setting_name' => DEFAULT_MODEL_OPTION,
+			)
+		);
+	} else {
+		register_connector_field(
+			'osaurus',
+			'default_model',
+			array(
+				'control'      => 'text',
+				'label'        => __( 'Default model', 'ai-provider-for-osaurus' ),
+				'description'  => __( 'Model ID to use when callers do not specify one. The server could not be reached to list models — enter an ID manually, or leave blank to let Osaurus choose.', 'ai-provider-for-osaurus' ),
+				'setting_name' => DEFAULT_MODEL_OPTION,
+			)
+		);
+	}
 
 	// select — a fixed set of choices exposed to REST as a schema `enum`.
 	register_connector_field(
@@ -336,6 +366,81 @@ function register_connector_fields(): void {
 	);
 }
 add_action( 'wp_connectors_init', __NAMESPACE__ . '\\register_connector_fields' );
+
+/**
+ * Transient key caching the model IDs advertised by the Osaurus server.
+ *
+ * @since 0.5.0
+ * @var string
+ */
+const MODEL_CHOICES_TRANSIENT = 'osaurus_model_choices';
+
+/**
+ * Fetches the model IDs the configured Osaurus server advertises, as a
+ * `[ id => id ]` map suitable for a `select` field's `choices`.
+ *
+ * Demonstrates how to populate a `select` connector field with live data:
+ * `select` needs concrete choices at registration time, so the dynamic list
+ * is fetched here and cached. A successful list is cached for an hour; a
+ * failure is cached briefly (30s) so an offline server is not polled on every
+ * admin page load.
+ *
+ * Uses `wp_safe_remote_get()` — the plugin's {@see allow_localhost_requests()}
+ * and {@see allow_osaurus_port()} filters already whitelist the configured
+ * host and port, so the loopback / non-standard-port request is permitted.
+ *
+ * @since 0.5.0
+ *
+ * @return array<string, string> Map of model ID to label, empty when the
+ *                               server cannot be reached.
+ */
+function osaurus_model_choices(): array {
+	$cached = get_transient( MODEL_CHOICES_TRANSIENT );
+	if ( is_array( $cached ) ) {
+		return $cached;
+	}
+
+	$url      = trailingslashit( get_base_url() ) . 'models';
+	$response = wp_safe_remote_get(
+		$url,
+		array(
+			'timeout' => 2,
+			'headers' => array( 'Accept' => 'application/json' ),
+		)
+	);
+
+	if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+		// Negative-cache briefly so a down server does not block every load.
+		set_transient( MODEL_CHOICES_TRANSIENT, array(), 30 );
+		return array();
+	}
+
+	$body    = json_decode( wp_remote_retrieve_body( $response ), true );
+	$choices = array();
+	foreach ( (array) ( $body['data'] ?? array() ) as $model ) {
+		if ( ! empty( $model['id'] ) && is_string( $model['id'] ) ) {
+			$choices[ $model['id'] ] = $model['id'];
+		}
+	}
+	ksort( $choices );
+
+	set_transient( MODEL_CHOICES_TRANSIENT, $choices, HOUR_IN_SECONDS );
+	return $choices;
+}
+
+/**
+ * Clears the cached model list when the server URL changes so the model
+ * picker re-fetches against the new server on the next admin load.
+ *
+ * @since 0.5.0
+ *
+ * @return void
+ */
+function clear_model_choices_cache(): void {
+	delete_transient( MODEL_CHOICES_TRANSIENT );
+}
+add_action( 'update_option_' . BASE_URL_OPTION, __NAMESPACE__ . '\\clear_model_choices_cache' );
+add_action( 'add_option_' . BASE_URL_OPTION, __NAMESPACE__ . '\\clear_model_choices_cache' );
 
 /**
  * Tells the AI plugin (`wp-content/plugins/ai`) that Osaurus counts as having
