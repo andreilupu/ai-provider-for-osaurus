@@ -6,7 +6,7 @@
  * Requires at least: 7.0
  * Tested up to:      7.0
  * Requires PHP:      7.4
- * Version:           0.4.2
+ * Version:           0.5.0
  * Author:            Andrei Lupu
  * Author URI:        https://github.com/andreilupu
  * License:           GPL-2.0-or-later
@@ -47,7 +47,7 @@ const PLUGIN_FILE = __FILE__;
  * @since 0.1.0
  * @var string
  */
-const PLUGIN_VERSION = '0.4.2';
+const PLUGIN_VERSION = '0.5.0';
 
 /**
  * Default Osaurus base URL, used when no constant or option is provided.
@@ -189,6 +189,64 @@ function register_fallback_auth(): void {
 add_action( 'init', __NAMESPACE__ . '\\register_fallback_auth', 15 );
 
 /**
+ * Declares Osaurus's configuration fields with the Connector Fields API.
+ *
+ * This is the preferred configuration path. When the WordPress Connector
+ * Fields API is available (`register_connector_field()`), the Connectors
+ * screen renders these fields itself — a URL input for the server address
+ * and a text input for the default model — and persists them over the
+ * Settings REST API. No plugin-side React component or custom REST route is
+ * required: compare this ~20-line declaration with the ~460-line
+ * `assets/js/connector-settings.js` renderer it replaces.
+ *
+ * Both fields reuse the existing option names ({@see BASE_URL_OPTION},
+ * {@see DEFAULT_MODEL_OPTION}) so {@see get_base_url()} and the provider keep
+ * working unchanged, and a site that had values saved under the previous
+ * approach needs no migration.
+ *
+ * When the API is absent (a WordPress build without the field registry), this
+ * is a no-op and the plugin falls back to {@see register_base_url_setting()}
+ * plus the client-side renderer — see the guards on those.
+ *
+ * @since 0.5.0
+ *
+ * @return void
+ */
+function register_connector_fields(): void {
+	if ( ! function_exists( 'register_connector_field' ) ) {
+		return;
+	}
+
+	register_connector_field(
+		'osaurus',
+		'base_url',
+		array(
+			'control'           => 'url',
+			'label'             => __( 'Server URL', 'ai-provider-for-osaurus' ),
+			'description'       => __( 'Base URL of your local Osaurus server, including the /v1 path.', 'ai-provider-for-osaurus' ),
+			'placeholder'       => DEFAULT_BASE_URL,
+			'default'           => DEFAULT_BASE_URL,
+			'sanitize_callback' => 'esc_url_raw',
+			'setting_name'      => BASE_URL_OPTION,
+			'env_var_name'      => 'OSAURUS_BASE_URL',
+			'constant_name'     => 'OSAURUS_BASE_URL',
+		)
+	);
+
+	register_connector_field(
+		'osaurus',
+		'default_model',
+		array(
+			'control'      => 'text',
+			'label'        => __( 'Default model', 'ai-provider-for-osaurus' ),
+			'description'  => __( 'Model ID to use when callers do not specify one. Leave blank to let Osaurus choose.', 'ai-provider-for-osaurus' ),
+			'setting_name' => DEFAULT_MODEL_OPTION,
+		)
+	);
+}
+add_action( 'wp_connectors_init', __NAMESPACE__ . '\\register_connector_fields' );
+
+/**
  * Tells the AI plugin (`wp-content/plugins/ai`) that Osaurus counts as having
  * credentials even when no API key option is stored.
  *
@@ -276,17 +334,22 @@ add_filter( 'http_allowed_safe_ports', __NAMESPACE__ . '\\allow_osaurus_port' );
  * Registers the Osaurus base-URL option so it can be read and written via
  * the WordPress Settings REST API (`/wp/v2/settings`).
  *
- * Our custom admin React component (see `assets/js/connector-settings.js`)
- * uses `useEntityRecord( 'root', 'site' )` from `@wordpress/core-data` to
- * read and persist this option. That flow only works when the option is
- * registered against the `connectors` settings group with `show_in_rest`
- * enabled and a sensible sanitize callback.
+ * Fallback path: when the Connector Fields API is available,
+ * {@see register_connector_fields()} declares these settings (the field
+ * registry calls `register_setting()` for each field), so this function
+ * early-returns to avoid registering them twice. It only runs on WordPress
+ * builds without the field API, where the client-side renderer still needs
+ * the options registered against the `connectors` group with `show_in_rest`.
  *
  * @since 0.3.0
  *
  * @return void
  */
 function register_base_url_setting(): void {
+	if ( function_exists( 'register_connector_field' ) ) {
+		return;
+	}
+
 	register_setting(
 		'connectors',
 		BASE_URL_OPTION,
@@ -582,12 +645,23 @@ function rest_get_health( \WP_REST_Request $request ) {
  * (`settings_page_options-connectors-wp-admin`) and the full-page variant
  * (`options-connectors`).
  *
+ * Fallback path: when the Connector Fields API is available the Connectors
+ * screen renders our declared fields itself (see
+ * {@see register_connector_fields()}), so this custom renderer is skipped —
+ * registering it would override the field-driven UI with the bespoke one.
+ * The client-side renderer is only loaded on WordPress builds without the
+ * field API.
+ *
  * @since 0.3.0
  *
  * @param string $hook_suffix Current admin screen hook suffix.
  * @return void
  */
 function enqueue_connector_settings_module( string $hook_suffix ): void {
+	if ( function_exists( 'register_connector_field' ) ) {
+		return;
+	}
+
 	$screen    = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 	$screen_id = $screen ? $screen->id : '';
 
