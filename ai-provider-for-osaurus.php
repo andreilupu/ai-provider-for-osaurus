@@ -193,16 +193,38 @@ add_action( 'init', __NAMESPACE__ . '\\register_fallback_auth', 15 );
  *
  * This is the preferred configuration path. When the WordPress Connector
  * Fields API is available (`register_connector_field()`), the Connectors
- * screen renders these fields itself — a URL input for the server address
- * and a text input for the default model — and persists them over the
- * Settings REST API. No plugin-side React component or custom REST route is
- * required: compare this ~20-line declaration with the ~460-line
- * `assets/js/connector-settings.js` renderer it replaces.
+ * screen renders and persists these fields itself over the Settings REST API.
+ * No plugin-side React component or custom REST route is required — compare
+ * this declaration with the ~460-line `assets/js/connector-settings.js`
+ * renderer it replaces.
  *
- * Both fields reuse the existing option names ({@see BASE_URL_OPTION},
- * {@see DEFAULT_MODEL_OPTION}) so {@see get_base_url()} and the provider keep
- * working unchanged, and a site that had values saved under the previous
- * approach needs no migration.
+ * ## Worked example of every control type
+ *
+ * This branch deliberately registers more fields than the plugin strictly
+ * needs, as a reference for the full range of controls the field API offers:
+ *
+ *   | Field            | control    | data type | notes                          |
+ *   | ---------------- | ---------- | --------- | ------------------------------ |
+ *   | base_url         | url        | string    | reuses {@see BASE_URL_OPTION}  |
+ *   | default_model    | text       | string    | reuses {@see DEFAULT_MODEL_OPTION} |
+ *   | response_format  | select     | string    | static `choices`               |
+ *   | temperature      | number     | number    | float, auto-generated option   |
+ *   | max_tokens       | number     | integer   | int, auto-generated option     |
+ *   | stream           | checkbox   | boolean   | auto-generated option          |
+ *   | system_prompt    | textarea   | string    | auto-generated option          |
+ *
+ * Two further controls round out the set but are not shown here: `password`
+ * is already supplied automatically as the synthetic `api_key` field that the
+ * core back-compat shim injects for every `api_key`-auth connector, and
+ * `custom` is a slot-fill placeholder for plugin-rendered React (the field API
+ * renders nothing for it by design).
+ *
+ * `base_url` and `default_model` pass an explicit `setting_name` to reuse the
+ * pre-existing options so {@see get_base_url()} and the provider keep working
+ * with no migration. The showcase fields omit `setting_name` to demonstrate
+ * auto-generation (`connectors_ai_osaurus_<field>`). Read any field's
+ * effective value with `wp_get_connector_field_value( 'osaurus', '<field>' )`,
+ * which resolves env var → constant → option → default.
  *
  * When the API is absent (a WordPress build without the field registry), this
  * is a no-op and the plugin falls back to {@see register_base_url_setting()}
@@ -217,6 +239,7 @@ function register_connector_fields(): void {
 		return;
 	}
 
+	// url — the server address. Reuses the existing option + env/constant.
 	register_connector_field(
 		'osaurus',
 		'base_url',
@@ -233,6 +256,7 @@ function register_connector_fields(): void {
 		)
 	);
 
+	// text — a free-form model ID.
 	register_connector_field(
 		'osaurus',
 		'default_model',
@@ -241,6 +265,73 @@ function register_connector_fields(): void {
 			'label'        => __( 'Default model', 'ai-provider-for-osaurus' ),
 			'description'  => __( 'Model ID to use when callers do not specify one. Leave blank to let Osaurus choose.', 'ai-provider-for-osaurus' ),
 			'setting_name' => DEFAULT_MODEL_OPTION,
+		)
+	);
+
+	// select — a fixed set of choices exposed to REST as a schema `enum`.
+	register_connector_field(
+		'osaurus',
+		'response_format',
+		array(
+			'control'     => 'select',
+			'label'       => __( 'Response format', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Preferred output format for completions.', 'ai-provider-for-osaurus' ),
+			'default'     => 'auto',
+			'choices'     => array(
+				'auto'        => __( 'Auto', 'ai-provider-for-osaurus' ),
+				'text'        => __( 'Plain text', 'ai-provider-for-osaurus' ),
+				'json_object' => __( 'JSON object', 'ai-provider-for-osaurus' ),
+			),
+		)
+	);
+
+	// number (float) — sampling temperature.
+	register_connector_field(
+		'osaurus',
+		'temperature',
+		array(
+			'control'     => 'number',
+			'type'        => 'number',
+			'label'       => __( 'Temperature', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Sampling temperature (0.0–2.0). Higher is more random.', 'ai-provider-for-osaurus' ),
+			'default'     => 0.7,
+		)
+	);
+
+	// number (integer) — token cap.
+	register_connector_field(
+		'osaurus',
+		'max_tokens',
+		array(
+			'control'     => 'number',
+			'type'        => 'integer',
+			'label'       => __( 'Max tokens', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Maximum tokens to generate per response. 0 means no explicit limit.', 'ai-provider-for-osaurus' ),
+			'default'     => 0,
+		)
+	);
+
+	// checkbox — a boolean toggle.
+	register_connector_field(
+		'osaurus',
+		'stream',
+		array(
+			'control'     => 'checkbox',
+			'type'        => 'boolean',
+			'label'       => __( 'Stream responses by default', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Request server-sent events when callers do not specify otherwise.', 'ai-provider-for-osaurus' ),
+			'default'     => false,
+		)
+	);
+
+	// textarea — multi-line free text.
+	register_connector_field(
+		'osaurus',
+		'system_prompt',
+		array(
+			'control'     => 'textarea',
+			'label'       => __( 'Default system prompt', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Prepended as the system message when a caller does not provide one.', 'ai-provider-for-osaurus' ),
 		)
 	);
 }
