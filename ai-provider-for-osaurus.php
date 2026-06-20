@@ -6,7 +6,7 @@
  * Requires at least: 7.0
  * Tested up to:      7.0
  * Requires PHP:      7.4
- * Version:           0.4.2
+ * Version:           0.5.0
  * Author:            Andrei Lupu
  * Author URI:        https://github.com/andreilupu
  * License:           GPL-2.0-or-later
@@ -47,7 +47,7 @@ const PLUGIN_FILE = __FILE__;
  * @since 0.1.0
  * @var string
  */
-const PLUGIN_VERSION = '0.4.2';
+const PLUGIN_VERSION = '0.5.0';
 
 /**
  * Default Osaurus base URL, used when no constant or option is provided.
@@ -189,6 +189,260 @@ function register_fallback_auth(): void {
 add_action( 'init', __NAMESPACE__ . '\\register_fallback_auth', 15 );
 
 /**
+ * Declares Osaurus's configuration fields with the Connector Fields API.
+ *
+ * This is the preferred configuration path. When the WordPress Connector
+ * Fields API is available (`register_connector_field()`), the Connectors
+ * screen renders and persists these fields itself over the Settings REST API.
+ * No plugin-side React component or custom REST route is required — compare
+ * this declaration with the ~460-line `assets/js/connector-settings.js`
+ * renderer it replaces.
+ *
+ * ## Worked example of every control type
+ *
+ * This branch deliberately registers more fields than the plugin strictly
+ * needs, as a reference for the full range of controls the field API offers:
+ *
+ *   | Field            | control    | data type | notes                          |
+ *   | ---------------- | ---------- | --------- | ------------------------------ |
+ *   | base_url         | url        | string    | reuses {@see BASE_URL_OPTION}  |
+ *   | default_model    | text       | string    | reuses {@see DEFAULT_MODEL_OPTION} |
+ *   | response_format  | select     | string    | static `choices`               |
+ *   | temperature      | number     | number    | float, auto-generated option   |
+ *   | max_tokens       | number     | integer   | int, auto-generated option     |
+ *   | stream           | checkbox   | boolean   | auto-generated option          |
+ *   | system_prompt    | textarea   | string    | auto-generated option          |
+ *
+ * Two further controls round out the set but are not shown here: `password`
+ * is already supplied automatically as the synthetic `api_key` field that the
+ * core back-compat shim injects for every `api_key`-auth connector, and
+ * `custom` is a slot-fill placeholder for plugin-rendered React (the field API
+ * renders nothing for it by design).
+ *
+ * `base_url` and `default_model` pass an explicit `setting_name` to reuse the
+ * pre-existing options so {@see get_base_url()} and the provider keep working
+ * with no migration. The showcase fields omit `setting_name` to demonstrate
+ * auto-generation (`connectors_ai_osaurus_<field>`). Read any field's
+ * effective value with `wp_get_connector_field_value( 'osaurus', '<field>' )`,
+ * which resolves env var → constant → option → default.
+ *
+ * When the API is absent (a WordPress build without the field registry), this
+ * is a no-op and the plugin falls back to {@see register_base_url_setting()}
+ * plus the client-side renderer — see the guards on those.
+ *
+ * @since 0.5.0
+ *
+ * @return void
+ */
+function register_connector_fields(): void {
+	if ( ! function_exists( 'register_connector_field' ) ) {
+		return;
+	}
+
+	// url — the server address. Reuses the existing option + env/constant.
+	register_connector_field(
+		'osaurus',
+		'base_url',
+		array(
+			'control'           => 'url',
+			'label'             => __( 'Server URL', 'ai-provider-for-osaurus' ),
+			'description'       => __( 'Base URL of your local Osaurus server, including the /v1 path.', 'ai-provider-for-osaurus' ),
+			'placeholder'       => DEFAULT_BASE_URL,
+			'default'           => DEFAULT_BASE_URL,
+			'sanitize_callback' => 'esc_url_raw',
+			'setting_name'      => BASE_URL_OPTION,
+			'env_var_name'      => 'OSAURUS_BASE_URL',
+			'constant_name'     => 'OSAURUS_BASE_URL',
+		)
+	);
+
+	// select with live choices — the model IDs the server actually advertises.
+	//
+	// `select` requires a non-empty `choices` map at registration time, but the
+	// list is dynamic, so we fetch it from the server's `/v1/models` endpoint
+	// (cached; see osaurus_model_choices()). When the server is unreachable we
+	// fall back to a free-form text input so the field still works offline.
+	//
+	// The live fetch is gated to admin requests: the choices only matter for
+	// rendering the Connectors screen, while the field's stored value resolves
+	// the same in every context regardless of control type. This keeps blocking
+	// HTTP off front-end page loads.
+	$model_choices = is_admin() ? osaurus_model_choices() : array();
+
+	if ( $model_choices ) {
+		register_connector_field(
+			'osaurus',
+			'default_model',
+			array(
+				'control'      => 'select',
+				'label'        => __( 'Default model', 'ai-provider-for-osaurus' ),
+				'description'  => __( 'Model to use when callers do not specify one.', 'ai-provider-for-osaurus' ),
+				'default'      => 'auto',
+				'choices'      => array_merge(
+					array( 'auto' => __( 'Auto (let Osaurus choose)', 'ai-provider-for-osaurus' ) ),
+					$model_choices
+				),
+				'setting_name' => DEFAULT_MODEL_OPTION,
+			)
+		);
+	} else {
+		register_connector_field(
+			'osaurus',
+			'default_model',
+			array(
+				'control'      => 'text',
+				'label'        => __( 'Default model', 'ai-provider-for-osaurus' ),
+				'description'  => __( 'Model ID to use when callers do not specify one. The server could not be reached to list models — enter an ID manually, or leave blank to let Osaurus choose.', 'ai-provider-for-osaurus' ),
+				'setting_name' => DEFAULT_MODEL_OPTION,
+			)
+		);
+	}
+
+	// select — a fixed set of choices exposed to REST as a schema `enum`.
+	register_connector_field(
+		'osaurus',
+		'response_format',
+		array(
+			'control'     => 'select',
+			'label'       => __( 'Response format', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Preferred output format for completions.', 'ai-provider-for-osaurus' ),
+			'default'     => 'auto',
+			'choices'     => array(
+				'auto'        => __( 'Auto', 'ai-provider-for-osaurus' ),
+				'text'        => __( 'Plain text', 'ai-provider-for-osaurus' ),
+				'json_object' => __( 'JSON object', 'ai-provider-for-osaurus' ),
+			),
+		)
+	);
+
+	// number (float) — sampling temperature.
+	register_connector_field(
+		'osaurus',
+		'temperature',
+		array(
+			'control'     => 'number',
+			'type'        => 'number',
+			'label'       => __( 'Temperature', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Sampling temperature (0.0–2.0). Higher is more random.', 'ai-provider-for-osaurus' ),
+			'default'     => 0.7,
+		)
+	);
+
+	// number (integer) — token cap.
+	register_connector_field(
+		'osaurus',
+		'max_tokens',
+		array(
+			'control'     => 'number',
+			'type'        => 'integer',
+			'label'       => __( 'Max tokens', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Maximum tokens to generate per response. 0 means no explicit limit.', 'ai-provider-for-osaurus' ),
+			'default'     => 0,
+		)
+	);
+
+	// checkbox — a boolean toggle.
+	register_connector_field(
+		'osaurus',
+		'stream',
+		array(
+			'control'     => 'checkbox',
+			'type'        => 'boolean',
+			'label'       => __( 'Stream responses by default', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Request server-sent events when callers do not specify otherwise.', 'ai-provider-for-osaurus' ),
+			'default'     => false,
+		)
+	);
+
+	// textarea — multi-line free text.
+	register_connector_field(
+		'osaurus',
+		'system_prompt',
+		array(
+			'control'     => 'textarea',
+			'label'       => __( 'Default system prompt', 'ai-provider-for-osaurus' ),
+			'description' => __( 'Prepended as the system message when a caller does not provide one.', 'ai-provider-for-osaurus' ),
+		)
+	);
+}
+add_action( 'wp_connectors_init', __NAMESPACE__ . '\\register_connector_fields' );
+
+/**
+ * Transient key caching the model IDs advertised by the Osaurus server.
+ *
+ * @since 0.5.0
+ * @var string
+ */
+const MODEL_CHOICES_TRANSIENT = 'osaurus_model_choices';
+
+/**
+ * Fetches the model IDs the configured Osaurus server advertises, as a
+ * `[ id => id ]` map suitable for a `select` field's `choices`.
+ *
+ * Demonstrates how to populate a `select` connector field with live data:
+ * `select` needs concrete choices at registration time, so the dynamic list
+ * is fetched here and cached. A successful list is cached for an hour; a
+ * failure is cached briefly (30s) so an offline server is not polled on every
+ * admin page load.
+ *
+ * Uses `wp_safe_remote_get()` — the plugin's {@see allow_localhost_requests()}
+ * and {@see allow_osaurus_port()} filters already whitelist the configured
+ * host and port, so the loopback / non-standard-port request is permitted.
+ *
+ * @since 0.5.0
+ *
+ * @return array<string, string> Map of model ID to label, empty when the
+ *                               server cannot be reached.
+ */
+function osaurus_model_choices(): array {
+	$cached = get_transient( MODEL_CHOICES_TRANSIENT );
+	if ( is_array( $cached ) ) {
+		return $cached;
+	}
+
+	$url      = trailingslashit( get_base_url() ) . 'models';
+	$response = wp_safe_remote_get(
+		$url,
+		array(
+			'timeout' => 2,
+			'headers' => array( 'Accept' => 'application/json' ),
+		)
+	);
+
+	if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+		// Negative-cache briefly so a down server does not block every load.
+		set_transient( MODEL_CHOICES_TRANSIENT, array(), 30 );
+		return array();
+	}
+
+	$body    = json_decode( wp_remote_retrieve_body( $response ), true );
+	$choices = array();
+	foreach ( (array) ( $body['data'] ?? array() ) as $model ) {
+		if ( ! empty( $model['id'] ) && is_string( $model['id'] ) ) {
+			$choices[ $model['id'] ] = $model['id'];
+		}
+	}
+	ksort( $choices );
+
+	set_transient( MODEL_CHOICES_TRANSIENT, $choices, HOUR_IN_SECONDS );
+	return $choices;
+}
+
+/**
+ * Clears the cached model list when the server URL changes so the model
+ * picker re-fetches against the new server on the next admin load.
+ *
+ * @since 0.5.0
+ *
+ * @return void
+ */
+function clear_model_choices_cache(): void {
+	delete_transient( MODEL_CHOICES_TRANSIENT );
+}
+add_action( 'update_option_' . BASE_URL_OPTION, __NAMESPACE__ . '\\clear_model_choices_cache' );
+add_action( 'add_option_' . BASE_URL_OPTION, __NAMESPACE__ . '\\clear_model_choices_cache' );
+
+/**
  * Tells the AI plugin (`wp-content/plugins/ai`) that Osaurus counts as having
  * credentials even when no API key option is stored.
  *
@@ -276,17 +530,22 @@ add_filter( 'http_allowed_safe_ports', __NAMESPACE__ . '\\allow_osaurus_port' );
  * Registers the Osaurus base-URL option so it can be read and written via
  * the WordPress Settings REST API (`/wp/v2/settings`).
  *
- * Our custom admin React component (see `assets/js/connector-settings.js`)
- * uses `useEntityRecord( 'root', 'site' )` from `@wordpress/core-data` to
- * read and persist this option. That flow only works when the option is
- * registered against the `connectors` settings group with `show_in_rest`
- * enabled and a sensible sanitize callback.
+ * Fallback path: when the Connector Fields API is available,
+ * {@see register_connector_fields()} declares these settings (the field
+ * registry calls `register_setting()` for each field), so this function
+ * early-returns to avoid registering them twice. It only runs on WordPress
+ * builds without the field API, where the client-side renderer still needs
+ * the options registered against the `connectors` group with `show_in_rest`.
  *
  * @since 0.3.0
  *
  * @return void
  */
 function register_base_url_setting(): void {
+	if ( function_exists( 'register_connector_field' ) ) {
+		return;
+	}
+
 	register_setting(
 		'connectors',
 		BASE_URL_OPTION,
@@ -582,12 +841,23 @@ function rest_get_health( \WP_REST_Request $request ) {
  * (`settings_page_options-connectors-wp-admin`) and the full-page variant
  * (`options-connectors`).
  *
+ * Fallback path: when the Connector Fields API is available the Connectors
+ * screen renders our declared fields itself (see
+ * {@see register_connector_fields()}), so this custom renderer is skipped —
+ * registering it would override the field-driven UI with the bespoke one.
+ * The client-side renderer is only loaded on WordPress builds without the
+ * field API.
+ *
  * @since 0.3.0
  *
  * @param string $hook_suffix Current admin screen hook suffix.
  * @return void
  */
 function enqueue_connector_settings_module( string $hook_suffix ): void {
+	if ( function_exists( 'register_connector_field' ) ) {
+		return;
+	}
+
 	$screen    = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 	$screen_id = $screen ? $screen->id : '';
 
