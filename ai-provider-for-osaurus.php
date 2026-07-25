@@ -604,11 +604,14 @@ function enqueue_connector_settings_module( string $hook_suffix ): void {
 
 	wp_register_script_module(
 		$handle,
-		plugins_url( 'assets/js/connector-settings.js', PLUGIN_FILE ),
+		// Built by `npm run build` (webpack). The bundle embeds
+		// `@wordpress/dataviews` and keeps `@wordpress/connectors` as its only
+		// external ES import; everything else resolves to `window.wp.*`.
+		plugins_url( 'build/connector-settings.js', PLUGIN_FILE ),
 		array(
 			// `@wordpress/connectors` is the only WP package exposed as a script
-			// module in WP 7.0 and is the sole ES import used by this file.
-			// All other `@wordpress/*` packages are consumed via the classic
+			// module in WP 7.0 and is the sole ES import left in the bundle.
+			// Every other `@wordpress/*` package is consumed via the classic
 			// `window.wp.*` globals that the Connectors page already enqueues.
 			array(
 				'import' => 'static',
@@ -618,16 +621,23 @@ function enqueue_connector_settings_module( string $hook_suffix ): void {
 		PLUGIN_VERSION
 	);
 
-	// Ensure the classic `window.wp.*` globals our module reads are printed
-	// for this request. The Connectors page boot already enqueues them, but
-	// declaring a classic-script dependency chain guarantees availability
-	// even if the page layout changes in the future.
+	// Ensure the classic `window.wp.*` globals the bundle reads are printed for
+	// this request. The Connectors page boot already enqueues them, but declaring
+	// the dependency chain guarantees availability even if the page layout
+	// changes. DataViews additionally needs data/compose/primitives/etc., so the
+	// list is broader than the hand-written version required.
 	wp_enqueue_script( 'wp-core-data' );
 	wp_enqueue_script( 'wp-components' );
 	wp_enqueue_script( 'wp-element' );
 	wp_enqueue_script( 'wp-i18n' );
 	wp_enqueue_script( 'wp-api-fetch' );
 	wp_enqueue_script( 'wp-url' );
+	wp_enqueue_script( 'wp-data' );
+	wp_enqueue_script( 'wp-compose' );
+	wp_enqueue_script( 'wp-primitives' );
+	wp_enqueue_script( 'wp-date' );
+	wp_enqueue_script( 'wp-deprecated' );
+	wp_enqueue_script( 'wp-keycodes' );
 
 	wp_enqueue_script_module( $handle );
 }
