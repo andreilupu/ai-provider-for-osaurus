@@ -640,5 +640,20 @@ function enqueue_connector_settings_module( string $hook_suffix ): void {
 	wp_enqueue_script( 'wp-keycodes' );
 
 	wp_enqueue_script_module( $handle );
+
+	// DataViews' stylesheet, emitted alongside the bundle by webpack. The
+	// Connectors screen does not use DataViews itself, so nothing else loads
+	// these rules and the form would render unstyled without this.
+	$style_path = plugin_dir_path( PLUGIN_FILE ) . 'build/style-connector-settings.css';
+	if ( file_exists( $style_path ) ) {
+		wp_enqueue_style(
+			$handle,
+			plugins_url( 'build/style-connector-settings.css', PLUGIN_FILE ),
+			array(),
+			PLUGIN_VERSION
+		);
+		// Serves `style-connector-settings-rtl.css` on RTL locales.
+		wp_style_add_data( $handle, 'rtl', 'replace' );
+	}
 }
 add_action( 'admin_enqueue_scripts', __NAMESPACE__ . '\\enqueue_connector_settings_module' );

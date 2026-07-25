@@ -126,11 +126,29 @@ module.exports = {
 		...defaultConfig.experiments,
 		outputModule: true,
 	},
-	// Keep the whole module in a single self-contained file.
+	module: {
+		...defaultConfig.module,
+		rules: [
+			...defaultConfig.module.rules,
+			// `@wordpress/dataviews` declares `"sideEffects": false`, so webpack
+			// tree-shakes away our side-effect-only stylesheet import from that
+			// package — silently, with no error and no emitted CSS. Flagging CSS
+			// as side-effectful keeps the import alive so the stylesheet is
+			// actually emitted.
+			{ test: /\.css$/i, sideEffects: true },
+		],
+	},
+	// Keep the JS in a single self-contained file.
+	//
+	// Do NOT set `splitChunks: false` here: wp-scripts relies on a
+	// `cacheGroups.style` group (type `css/mini-extract`, enforced) to gather
+	// imported CSS into an emitted chunk. Disabling splitChunks leaves the CSS
+	// modules orphaned — webpack processes them and then emits no stylesheet at
+	// all, silently. The inherited config already sets `cacheGroups.default:
+	// false`, so JS is not split into vendor chunks either way.
 	optimization: {
 		...defaultConfig.optimization,
 		runtimeChunk: false,
-		splitChunks: false,
 	},
 	externalsType: 'window',
 	externals,

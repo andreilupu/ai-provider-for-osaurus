@@ -25,7 +25,11 @@ ai-provider-for-osaurus.php   # Entry point: hooks, HTTP filters, REST routes
 uninstall.php                 # Deletes options on uninstall (single + multisite)
 readme.txt                    # The wp.org-facing readme (NOT Readme.md)
 assets/img/osaurus.svg        # Provider logo (shipped)
-assets/js/connector-settings.js  # Connectors admin React module
+assets/js/connector-settings.js  # Connectors admin module (SOURCE, shipped so
+                              #   the compiled bundle has readable sources)
+build/connector-settings.js   # Compiled bundle actually enqueued (built by CI;
+                              #   gitignored, so absent from a fresh clone)
+build/style-connector-settings.css       # DataViews styles (+ -rtl variant)
 src/autoload.php              # PSR-4 autoloader (no Composer at runtime)
 src/Provider/OsaurusProvider.php
 src/Models/OsaurusTextGenerationModel.php
@@ -48,7 +52,20 @@ add it to `.distignore`** or it will ship to users.
   Symlink or clone the repo into `wp-content/plugins/` and activate.
 - **There is no `wp-env` / Docker setup, and we don't want one.** Do not add
   `.wp-env.json` or wp-env references.
-- No build step — the plugin ships as-is (the JS is a plain module, no bundler).
+- **There is a JS build step** (since 0.5.0). The connector settings module
+  bundles `@wordpress/dataviews`, which WordPress does not expose at runtime:
+
+  ```bash
+  npm install       # once
+  npm run build     # -> build/connector-settings.js + build/style-*.css
+  npm run start     # watch mode
+  ```
+
+  `build/` is gitignored and produced by CI (`deploy.yml`, `plugin-check.yml`)
+  before the artifact is staged, so **after pulling you must run `npm run build`
+  or the settings panel will not load**. See `webpack.config.js` for why the
+  externals split is unusual (script module + `window.wp.*` globals + bundled
+  DataViews) — changing it casually will break the screen in subtle ways.
 - PHP floor is **7.4**. Do not use 8.0+ syntax (`str_contains`,
   `str_starts_with`, `match`, named args, enums, `?->`). Use `strpos` etc.
 

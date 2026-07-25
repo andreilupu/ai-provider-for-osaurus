@@ -1,6 +1,6 @@
 {
 	"name": "ai-provider-for-osaurus",
-	"version": "0.5.0-dataforms",
+	"version": "0.4.2",
 	"private": true,
 	"description": "Osaurus connector settings rendered with @wordpress/dataviews DataForm.",
 	"license": "GPL-2.0-or-later",

@@ -28,6 +28,13 @@ import {
 } from '@wordpress/connectors';
 import { DataForm } from '@wordpress/dataviews';
 
+// DataViews ships its own stylesheet, and nothing on the Connectors screen
+// loads it (the screen does not use DataViews itself). Importing it here makes
+// webpack emit `build/connector-settings.css`, which the plugin enqueues — see
+// `enqueue_connector_settings_module()`. Without this the form renders
+// unstyled.
+import '@wordpress/dataviews/build-style/style.css';
+
 /** @type {typeof window.wp.element} */
 const { createElement: h, useState } = window.wp.element;
 
