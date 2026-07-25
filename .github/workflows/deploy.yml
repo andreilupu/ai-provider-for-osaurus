@@ -45,6 +45,23 @@ jobs:
             exit 1
           fi
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build JS/CSS
+        # `build/` is gitignored, so the compiled connector settings bundle only
+        # exists after this step. It is NOT in .distignore, so the deploy action
+        # copies it into SVN. Without this the shipped plugin would reference a
+        # `build/connector-settings.js` that does not exist.
+        run: |
+          npm ci
+          npm run build
+          test -f build/connector-settings.js
+          test -f build/style-connector-settings.css
+
       - name: Deploy to WordPress.org SVN
         uses: 10up/action-wordpress-plugin-deploy@stable
         env:

@@ -1,0 +1,17 @@
+{
+	"name": "ai-provider-for-osaurus",
+	"version": "0.4.2",
+	"private": true,
+	"description": "Osaurus connector settings rendered with @wordpress/dataviews DataForm.",
+	"license": "GPL-2.0-or-later",
+	"scripts": {
+		"build": "wp-scripts build",
+		"start": "wp-scripts start"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^30.0.0"
+	},
+	"dependencies": {
+		"@wordpress/dataviews": "^16.0.0"
+	}
+}

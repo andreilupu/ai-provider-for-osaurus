@@ -36,11 +36,25 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build JS/CSS
+        # The connector settings bundle is compiled, and `build/` is gitignored,
+        # so it must be built before staging or the checked artifact would be
+        # missing the JS/CSS that ships to users.
+        run: |
+          npm ci
+          npm run build
+
       - name: Stage production artifact
         # Plugin Check mounts whatever build-dir points at as the production
         # plugin (slug = directory basename). Staging a .distignore-filtered
         # mirror keeps repo-only files out of scope so the check matches the
-        # shipped plugin. The plugin has no build step — it ships as-is.
+        # shipped plugin — including the built `build/` directory.
         run: |
           rm -rf .dist
           mkdir -p .dist/ai-provider-for-osaurus
